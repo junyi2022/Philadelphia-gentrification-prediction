@@ -13,6 +13,12 @@ editor_options:
     wrap: 72
 ---
 
+Block Group:
+
+Train Model: 2017-2019 (census, housing)
+double check changes
+Validate Model: 2019-2021 (census, housing)
+depend on final performance
 
 ```{r setup, include=FALSE}
 
@@ -61,7 +67,7 @@ The census data we use for this analysis is ACS 5-year data in 2015, and the geo
 ```{r, eval = FALSE}
 
 Demo <- get_acs(geography = "tract", 
-          survey = "acs5",
+          survey = "acs",
           variables = c("B01001_001E", "B01001A_001E", "B07011_001E"), 
           year = 2015, 
           state = "53", 
