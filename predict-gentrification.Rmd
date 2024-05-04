@@ -1,0 +1,254 @@
+---
+title: "Philadelphia Gentrification Prediction Using Machine Learning"
+author: "Junyi Yang, Ziyi Guo, Haoyu Zhu"
+date: "May, 2024"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: hide
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+
+```{r setup, include=FALSE}
+
+# You can set some global options for knitting chunks
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  cache = TRUE
+)
+
+# Load some libraries
+
+library(tidycensus)
+library(tidyverse)
+library(sf)
+library(spdep)
+library(caret)
+library(ckanr)
+library(FNN)
+library(grid)
+library(gridExtra)
+library(ggcorrplot) # plot correlation plot
+library(corrr)      # another way to plot correlation plot
+library(kableExtra)
+library(jtools)     # for regression model plots
+library(ggstance) # to support jtools plots
+library(ggpubr)    # plotting R^2 value on ggplot point scatter
+library(broom.mixed) # needed for effects plots
+library(RColorBrewer)
+library(dplyr)
+library(ggplot2)
+library(RColorBrewer)
+library(spatstat)
+library(corrr)
+library(classInt)
+
+```
+
+## Introduction
+
+## Calculate Gentrification (Dependent Variable)
+### Demographic Data
+The census data we use for this analysis is ACS 5-year data in 2015, and the geography is census tract. The demographic data we want to include in this analysis are total poplation, percentage of white population, and median income.
+```{r, eval = FALSE}
+
+Demo <- get_acs(geography = "tract", 
+          survey = "acs5",
+          variables = c("B01001_001E", "B01001A_001E", "B07011_001E"), 
+          year = 2015, 
+          state = "53", 
+          county = "033", 
+          geometry = T, 
+          output = "wide") %>%
+  st_transform(crs = 2926) %>%
+  rename(TotalPop = B01001_001E,
+         NumberWhites = B01001A_001E,
+         MedIncome = B07011_001E) %>%
+  mutate(pctWhite = NumberWhites / TotalPop)%>%
+  select(-NAME, -GEOID)
+
+```
+
+```{r, include = FALSE}
+
+Demo <- get_acs(geography = "tract", 
+          survey = "acs5",
+          variables = c("B01001_001E", "B01001A_001E", "B07011_001E"), 
+          year = 2015, 
+          state = "53", 
+          county = "033", 
+          geometry = T, 
+          output = "wide") %>%
+  st_transform(crs = 2926) %>%
+  rename(TotalPop = B01001_001E,
+         NumberWhites = B01001A_001E,
+         MedIncome = B07011_001E) %>%
+  mutate(pctWhite = NumberWhites / TotalPop)%>%
+  select(-NAME, -GEOID)
+
+```
+
+### Visualize 
+
+Have a look at the housing price of Seattle in 2015 to have a general idea of the dependent variable of the model.
+
+```{r selected variables map}
+
+
+
+
+
+```
+
+
+## Data Wrangling (Independent Variables)
+
+### Data Gathering
+The model needs multiple spatial and non-spatial data as possible independent variable. The first step here is to collect and read those data. The list includes:
+1. 
+2. 
+3. 
+4. 
+5. 
+6. 
+7. 
+8. 
+
+
+```{r get data, include=FALSE}
+
+
+
+```
+
+### Data Processing
+count / nearest neighbors / buffer
+#### Safety data
+
+```{r}
+
+
+```
+
+
+#### Amenities Data
+The amenities data we used includes 
+
+```{r}
+
+
+```
+
+
+
+#### Canopy Data
+
+```{r}
+
+
+
+```
+
+#### Data
+
+
+```{r}
+
+
+```
+
+
+## Summarize and preview the variables
+
+The table shows all the independent variables by categories.
+
+```{r preview the data}
+
+
+```
+
+
+
+## Model development
+methodology explanation
+
+### Analyzing associations
+An overview of the association between gentrification and multiple independent variables
+```{r Correlation, fig.height=7, fig.width=10}
+
+
+
+```
+
+
+### Correlation matrix
+
+
+```{r fig.height=10, fig.width=10}
+
+
+
+```
+
+
+
+### Multivariate Regression
+
+Construct baseline model
+```{r mutlivariate_regression}
+
+
+
+```
+
+
+
+## Model testing
+cross validation
+```{r }
+
+
+```
+over/under predict location
+### Mean Absolute Percentage Error
+```{r }
+
+
+```
+
+
+
+### Cross validation
+
+
+```{r}
+
+
+```
+### Result of model testing
+
+## Validation
+history data
+```{r}
+
+
+```
+
+### Summary
+why invest
+recommendation for implementation
+
+### Appendix
+data souce, variable defination, model specification
+
+
+
+
