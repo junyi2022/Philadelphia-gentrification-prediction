@@ -13,13 +13,6 @@ editor_options:
     wrap: 72
 ---
 
-Block Group:
-
-Train Model: 2017-2019 (census, housing)
-double check changes
-Validate Model: 2019-2021 (census, housing)
-depend on final performance
-
 ```{r setup, include=FALSE}
 
 # You can set some global options for knitting chunks
