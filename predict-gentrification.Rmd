@@ -1,5 +1,5 @@
 ---
-title: "Philadelphia Gentrification Prediction Using Machine Learning"
+title: "Philadelphia Census Block Group Gentrification Prediction Using Machine Learning"
 author: "Junyi Yang, Ziyi Guo, Haoyu Zhu"
 date: "May, 2024"
 output:
@@ -28,6 +28,7 @@ knitr::opts_chunk$set(
 
 library(tidycensus)
 library(tidyverse)
+library(dplyr)
 library(sf)
 library(spdep)
 library(caret)
@@ -46,7 +47,6 @@ library(RColorBrewer)
 library(dplyr)
 library(ggplot2)
 library(RColorBrewer)
-library(spatstat)
 library(corrr)
 library(classInt)
 
@@ -54,73 +54,125 @@ library(classInt)
 
 ## Introduction
 
+This project aims to use machine learning methods to forecast patterns of gentrification in the unit of census block groups within Philadelphia. Gentrification, a complex socioeconomic phenomenon, has significant implications for urban development, housing affordability, and community dynamics. From the research of the [Urban Displacement Project](https://www.urbandisplacement.org/about/what-are-gentrification-and-displacement/), gentrification is usually associated with real estate speculation, increased investment in neighborhood amenities such as transit and parks, change in land use, and changes in the character of the neighborhood such as business type change." These new investments often lead to displacement of existing low-income residents through rent increase, eviction, and other displacement pressure. Therefore, this project seeks to empower policymakers, urban planners, and community advocates to make informed decisions and implement equitable strategies for sustainable growth and inclusive development.   
+
+This project will use the 2017 and 2019 data to train the machine learning model and use 2019 and 2021 data to do the validation. The census data used in this project is from [American Census Survey (ACS)](https://data.census.gov/) 5-year survey, and other data used in this project comes from [OpenDataPhilly](https://opendataphilly.org/).    
+
 ## Calculate Gentrification (Dependent Variable)
-### Demographic Data
-The census data we use for this analysis is ACS 5-year data in 2015, and the geography is census tract. The demographic data we want to include in this analysis are total poplation, percentage of white population, and median income.
-```{r, eval = FALSE}
 
-Demo <- get_acs(geography = "tract", 
-          survey = "acs",
-          variables = c("B01001_001E", "B01001A_001E", "B07011_001E"), 
-          year = 2015, 
-          state = "53", 
-          county = "033", 
-          geometry = T, 
-          output = "wide") %>%
-  st_transform(crs = 2926) %>%
-  rename(TotalPop = B01001_001E,
-         NumberWhites = B01001A_001E,
-         MedIncome = B07011_001E) %>%
-  mutate(pctWhite = NumberWhites / TotalPop)%>%
-  select(-NAME, -GEOID)
+Since gentrification is a vague and variable term, we need to define gentrification in this project and calculate the area of gentrification within Philadelphia by using related geospatial datasets.  
 
-```
+Based on the [dictionary definition](https://www.merriam-webster.com/dictionary/gentrification), the term *gentrification* means "a process in which a poor area (as of a city) experiences an influx of middle-class or wealthy people who renovate and rebuild homes and businesses and which often results in an increase in property values and the displacement of earlier, usually poorer residents." In this way, there are two main characteristics of gentrification: census composition change and property value change.  
+
+Firstly, for the census composition change, we define a census block group as gentrifying if its percentage of minority group (non-white) decreases by more than 8% in a 2-year interval and its median household income before is below Philadelphia County's median. In a research about ["Gentrification Definitions and Racial Change: Considering the Evidence,"](https://www.enterprisecommunity.org/resources/gentrification-definitions-and-racial-change-considering-evidence) it analyzes racial change compared to the status of gentrification. Extracting the information from this study and briefly simplifying the analysis, the gentrification area usually has a net loss of black people between 1.1 to 8.4 percent. Besides, this research also points to an online [Gentrification Comparison Tool](https://www.enterprisecommunity.org/resources/gentrification-comparison-tool) that "takes 3 popular approaches to measure gentrification - by Freeman (2005), Ellen & O’Regan (2008), and McKinnish et al (2010)." From there, the census data change they focus on is *average household income*. The 3 approaches have slightly different standards to define gentrification based on average household income: median household income below metro area median, average household income below 70% of metro area median, or average household income in the bottom 20% among all evaluated tracts nationally. In order to fit our analysis of Philadelphia County, this project will use *median household income below metro area median*.  
+
+Secondly, for the property value change, we define it as a more than 10% increase in a 2-year interval. Based on the research from Drexel University Urban Heath Collaborative's study of ["A Measure of Gentrification For Use in Longitudinal Public Health Studies in the US,"](https://drexel.edu/uhc/resources/briefs/Measure-of-Gentrification-for-Use-in-Longitudinal-Public-Health-Studies-in-the-US/) it used 50% - 75% increase in home value in a 10-year interval to define gentrification and more than 75% home value increase to define intense gentrification. Therefore, transferring this criterion to our 2-year interval will be a *more than 10% increase*.  
+
+__In summary, our method to calculate gentrification is:__    
+1. Percentage of minority group (non-white) decreases by more than 8% in a 2-year interval.  
+2. Median household income 2 years ago was below Philadelphia County's median.
+3. More than 10% increase of property value in a 2-year interval
+
+### Census Data
+
+The census data we need to collect for calculating gentrification is ACS 5-year data in 2017, 2019, and 2021, and the geography is census block groups in Philadelphia. The demographic data we need to include are total population, percentage of non-white population, and median household income.  
 
 ```{r, include = FALSE}
 
-Demo <- get_acs(geography = "tract", 
+census2017 <- get_acs(geography = "block group", 
           survey = "acs5",
-          variables = c("B01001_001E", "B01001A_001E", "B07011_001E"), 
-          year = 2015, 
-          state = "53", 
-          county = "033", 
+          variables = c("B01001_001E", "B02001_002E", "B19013_001E"), 
+          year = 2017, 
+          state = "42", 
+          county = "101", 
           geometry = T, 
           output = "wide") %>%
-  st_transform(crs = 2926) %>%
+  st_transform(crs = 2272) %>%
   rename(TotalPop = B01001_001E,
-         NumberWhites = B01001A_001E,
-         MedIncome = B07011_001E) %>%
-  mutate(pctWhite = NumberWhites / TotalPop)%>%
-  select(-NAME, -GEOID)
+         NumberWhites = B02001_002E,
+         MedHhIncome = B19013_001E) %>%
+  mutate(pctNonWhite = 1 - NumberWhites / TotalPop)%>%
+  select(-NAME, -GEOID, -B01001_001M, -B02001_002M, -B19013_001M)
+
+census2019 <- get_acs(geography = "block group", 
+          survey = "acs5",
+          variables = c("B01001_001E", "B02001_002E", "B19013_001E"), 
+          year = 2019, 
+          state = "42", 
+          county = "101", 
+          geometry = T, 
+          output = "wide") %>%
+  st_transform(crs = 2272) %>%
+  rename(TotalPop = B01001_001E,
+         NumberWhites = B02001_002E,
+         MedHhIncome = B19013_001E) %>%
+  mutate(pctNonWhite = 1 - NumberWhites / TotalPop)%>%
+  select(-NAME, -GEOID, -B01001_001M, -B02001_002M, -B19013_001M)
+
+census2021 <- get_acs(geography = "block group", 
+          survey = "acs5",
+          variables = c("B01001_001E", "B02001_002E", "B19013_001E"), 
+          year = 2021, 
+          state = "42", 
+          county = "101", 
+          geometry = T, 
+          output = "wide") %>%
+  st_transform(crs = 2272) %>%
+  rename(TotalPop = B01001_001E,
+         NumberWhites = B02001_002E,
+         MedHhIncome = B19013_001E) %>%
+  mutate(pctNonWhite = 1 - NumberWhites / TotalPop)%>%
+  select(-NAME, -GEOID, -B01001_001M, -B02001_002M, -B19013_001M)
 
 ```
 
-### Visualize 
+Since one of our criteria needs to compare median income to Philadelphia County's value. We need to calculate the median difference for the selected three years as well. Because some of the block groups do not have median household income value data from the census survey, we will keep the household income difference for those as NA as well.  
 
-Have a look at the housing price of Seattle in 2015 to have a general idea of the dependent variable of the model.
+```{r}
 
-```{r selected variables map}
+census2017 <- census2017 %>%
+  mutate(MedHhIncomeDif = ifelse(is.na(census2017$MedHhIncome), NA, median(na.omit(census2017$MedHhIncome)) - census2017$MedHhIncome))
 
+census2019 <- census2019 %>%
+  mutate(MedHhIncomeDif = ifelse(is.na(census2019$MedHhIncome), NA, median(na.omit(census2019$MedHhIncome)) - census2019$MedHhIncome))
 
+census2017 <- census2017 %>%
+  mutate(MedHhIncomeDif = ifelse(is.na(census2017$MedHhIncome), NA, median(na.omit(census2021$MedHhIncome)) - census2017$MedHhIncome))
+
+```
+
+### Property Value Data
+
+The property value data used in this project comes from OpenDataPhilly's [Philadelphia Properties and Assessment History](https://opendataphilly.org/datasets/philadelphia-properties-and-assessment-history/) dataset. 
+
+*This data updates nightly. Please ignore the 'created by' date below - the date of October 2020 shows when this webpage, not the data, was created.*
+
+```{r}
+
+OPAData <- 
+  read.csv(file.path("https://opendata-downloads.s3.amazonaws.com/opa_properties_public.csv"))
+
+AssessData <- 
+  read.csv(file.path("https://opendata-downloads.s3.amazonaws.com/assessments.csv"))
 
 
 
 ```
+
+### Combine and Visualize
+
+Have a look at the housing price of Seattle in 2015 to have a general
+idea of the dependent variable of the model.
+
 
 
 ## Data Wrangling (Independent Variables)
 
 ### Data Gathering
-The model needs multiple spatial and non-spatial data as possible independent variable. The first step here is to collect and read those data. The list includes:
-1. 
-2. 
-3. 
-4. 
-5. 
-6. 
-7. 
-8. 
 
+The model needs multiple spatial and non-spatial data as possible
+independent variable. The first step here is to collect and read those
+data. The list includes: 1. eviction 2. redline 3. 4. 5. 6. 7. 8.
 
 ```{r get data, include=FALSE}
 
@@ -129,24 +181,22 @@ The model needs multiple spatial and non-spatial data as possible independent va
 ```
 
 ### Data Processing
-count / nearest neighbors / buffer
-#### Safety data
+
+count / nearest neighbors / buffer \#### Safety data
 
 ```{r}
 
 
 ```
-
 
 #### Amenities Data
-The amenities data we used includes 
+
+The amenities data we used includes
 
 ```{r}
 
 
 ```
-
-
 
 #### Canopy Data
 
@@ -158,12 +208,10 @@ The amenities data we used includes
 
 #### Data
 
-
 ```{r}
 
 
 ```
-
 
 ## Summarize and preview the variables
 
@@ -174,22 +222,22 @@ The table shows all the independent variables by categories.
 
 ```
 
-
-
 ## Model development
+
 methodology explanation
 
 ### Analyzing associations
-An overview of the association between gentrification and multiple independent variables
+
+An overview of the association between gentrification and multiple
+independent variables
+
 ```{r Correlation, fig.height=7, fig.width=10}
 
 
 
 ```
 
-
 ### Correlation matrix
-
 
 ```{r fig.height=10, fig.width=10}
 
@@ -197,57 +245,68 @@ An overview of the association between gentrification and multiple independent v
 
 ```
 
-
-
 ### Multivariate Regression
 
 Construct baseline model
+
 ```{r mutlivariate_regression}
 
 
 
 ```
 
-
-
 ## Model testing
+
 cross validation
+
 ```{r }
 
 
 ```
-over/under predict location
+
+over/under predict location 
+
 ### Mean Absolute Percentage Error
+
 ```{r }
 
 
 ```
-
-
 
 ### Cross validation
-
 
 ```{r}
 
 
 ```
+
 ### Result of model testing
 
 ## Validation
+
 history data
+
 ```{r}
 
 
 ```
 
 ### Summary
-why invest
-recommendation for implementation
+
+why invest recommendation for implementation
 
 ### Appendix
-data souce, variable defination, model specification
 
+data source, variable definition, model specification
 
+#### References
 
+“Definition of GENTRIFICATION.” In Merriam-Webster, April 29, 2024. https://www.merriam-webster.com/dictionary/gentrification.  
 
+“Gentrification Comparison Tool | Enterprise Community Partners.” Accessed May 5, 2024. https://www.enterprisecommunity.org/resources/gentrification-comparison-tool.  
+
+Methods Brief. “A Measure of Gentrification for Use in Longitudinal Public Health Studies in the US.” Drexel University Urban Health Collaborative, August 2019. https://drexel.edu/uhc/resources/briefs/Measure-of-Gentrification-for-Use-in-Longitudinal-Public-Health-Studies-in-the-US/.  
+
+Rachel Bogardus Drew. “Gentrification Definitions and Racial Change: Considering the Evidence.” Enterprise Community Partners, May 1, 2020. https://www.enterprisecommunity.org/resources/gentrification-definitions-and-racial-change-considering-evidence.  
+
+“What Are Gentrification and Displacement – Urban Displacement.” Accessed May 5, 2024. https://www.urbandisplacement.org/about/what-are-gentrification-and-displacement/.   
