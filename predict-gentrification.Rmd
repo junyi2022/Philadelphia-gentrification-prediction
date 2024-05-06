@@ -87,7 +87,7 @@ census2017 <- get_acs(geography = "block group",
           county = "101", 
           geometry = T, 
           output = "wide") %>%
-  st_transform(crs = 3857) %>%
+  st_transform(crs = 2272) %>%
   rename(TotalPop = B01001_001E,
          NumberWhites = B02001_002E,
          MedHhIncome = B19013_001E) %>%
@@ -102,7 +102,7 @@ census2019 <- get_acs(geography = "block group",
           county = "101", 
           geometry = T, 
           output = "wide") %>%
-  st_transform(crs = 3857) %>%
+  st_transform(crs = 2272) %>%
   rename(TotalPop = B01001_001E,
          NumberWhites = B02001_002E,
          MedHhIncome = B19013_001E) %>%
@@ -117,7 +117,7 @@ census2021 <- get_acs(geography = "block group",
           county = "101", 
           geometry = T, 
           output = "wide") %>%
-  st_transform(crs = 3857) %>%
+  st_transform(crs = 2272) %>%
   rename(TotalPop = B01001_001E,
          NumberWhites = B02001_002E,
          MedHhIncome = B19013_001E) %>%
@@ -143,20 +143,28 @@ census2017 <- census2017 %>%
 
 ### Property Value Data
 
+The property value data used in this project comes from OpenDataPhilly's [Philadelphia Properties and Assessment History](https://opendataphilly.org/datasets/philadelphia-properties-and-assessment-history/) dataset. 
 
+*This data updates nightly. Please ignore the 'created by' date below - the date of October 2020 shows when this webpage, not the data, was created.*
+
+```{r}
+
+OPAData <- 
+  read.csv(file.path("https://opendata-downloads.s3.amazonaws.com/opa_properties_public.csv"))
+
+AssessData <- 
+  read.csv(file.path("https://opendata-downloads.s3.amazonaws.com/assessments.csv"))
+
+
+
+```
 
 ### Combine and Visualize
 
 Have a look at the housing price of Seattle in 2015 to have a general
 idea of the dependent variable of the model.
 
-```{r selected variables map}
 
-
-
-
-
-```
 
 ## Data Wrangling (Independent Variables)
 
