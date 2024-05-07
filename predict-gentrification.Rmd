@@ -51,7 +51,13 @@ library(corrr)
 library(classInt)
 library(tmap)
 
-my_colors <- c("#033E56", "#518984", "#9DC9A3", "#F5CD42", "#F5A70A", "#D05A30")
+#my_colors <- c("#033E56", "#518984", "#9DC9A3", "#F5CD42", "#F5A70A", "#D05A30")
+
+# inflation rate for 2017 is *2.13%*, for 2018 is *2.44%*, for 2019 is *1.81%*, for 2020 is *1.23%*.  
+inflationAdjust2017 <- 1.0213
+inflationAdjust2018 <- 1.0244
+# inflationAdjust2019 <- 1.0181
+# inflationAdjust2020 <- 1.0123
 
 ```
 
@@ -59,7 +65,7 @@ my_colors <- c("#033E56", "#518984", "#9DC9A3", "#F5CD42", "#F5A70A", "#D05A30")
 
 This project aims to use machine learning methods to forecast patterns of gentrification in the unit of census block groups within Philadelphia. Gentrification, a complex socioeconomic phenomenon, has significant implications for urban development, housing affordability, and community dynamics. From the research of the [Urban Displacement Project](https://www.urbandisplacement.org/about/what-are-gentrification-and-displacement/), gentrification is usually associated with real estate speculation, increased investment in neighborhood amenities such as transit and parks, change in land use, and changes in the character of the neighborhood such as business type change." These new investments often lead to displacement of existing low-income residents through rent increase, eviction, and other displacement pressure. Therefore, this project seeks to empower policymakers, urban planners, and community advocates to make informed decisions and implement equitable strategies for sustainable growth and inclusive development.   
 
-This project will use the 2017 and 2019 data to train the machine learning model and use 2019 and 2021 data to do the validation. The census data used in this project is from [American Census Survey (ACS)](https://data.census.gov/) 5-year survey, and other data used in this project comes from [OpenDataPhilly](https://opendataphilly.org/).    
+This project will use the 2017 and 2018 data to train the machine learning model and use 2018 and 2019 data to do the validation. The census data used in this project is from [American Census Survey (ACS)](https://data.census.gov/) 5-year survey, and other data used in this project comes from [OpenDataPhilly](https://opendataphilly.org/).    
 
 ## Calculate Gentrification (Dependent Variable)
 
@@ -67,14 +73,16 @@ Since gentrification is a vague and variable term, we need to define gentrificat
 
 Based on the [dictionary definition](https://www.merriam-webster.com/dictionary/gentrification), the term *gentrification* means "a process in which a poor area (as of a city) experiences an influx of middle-class or wealthy people who renovate and rebuild homes and businesses and which often results in an increase in property values and the displacement of earlier, usually poorer residents." In this way, there are two main characteristics of gentrification: census composition change and property value change.  
 
-Firstly, for the census composition change, we define a census block group as gentrifying if its percentage of minority group (non-white) decreases by more than 8% in a 2-year interval and its median household income before is below Philadelphia County's median. In a research about ["Gentrification Definitions and Racial Change: Considering the Evidence,"](https://www.enterprisecommunity.org/resources/gentrification-definitions-and-racial-change-considering-evidence) it analyzes racial change compared to the status of gentrification. Extracting the information from this study and briefly simplifying the analysis, the gentrification area usually has a net loss of black people between 1.1 to 8.4 percent. Besides, this research also points to an online [Gentrification Comparison Tool](https://www.enterprisecommunity.org/resources/gentrification-comparison-tool) that "takes 3 popular approaches to measure gentrification - by Freeman (2005), Ellen & O’Regan (2008), and McKinnish et al (2010)." From there, the census data change they focus on is *average household income*. The 3 approaches have slightly different standards to define gentrification based on average household income: median household income below metro area median, average household income below 70% of metro area median, or average household income in the bottom 20% among all evaluated tracts nationally. In order to fit our analysis of Philadelphia County, this project will use *median household income below metro area median*.  
+Firstly, for the census composition change, we define a census block group as gentrifying if its percentage of minority group (non-white) decreases by more than 8% in a 1-year interval and its median household income before is below Philadelphia County's median. In a research about ["Gentrification Definitions and Racial Change: Considering the Evidence,"](https://www.enterprisecommunity.org/resources/gentrification-definitions-and-racial-change-considering-evidence) it analyzes racial change compared to the status of gentrification. Extracting the information from this study and briefly simplifying the analysis, the gentrification area usually has a net loss of black people between 1.1 to 8.4 percent. Besides, this research also points to an online [Gentrification Comparison Tool](https://www.enterprisecommunity.org/resources/gentrification-comparison-tool) that "takes 3 popular approaches to measure gentrification - by Freeman (2005), Ellen & O’Regan (2008), and McKinnish et al (2010)." From there, the census data change they focus on is *average household income*. The 3 approaches have slightly different standards to define gentrification based on average household income: median household income below metro area median, average household income below 70% of metro area median, or average household income in the bottom 20% among all evaluated tracts nationally. In order to fit our analysis of Philadelphia County, this project will use *median household income below metro area median*.  
 
-Secondly, for the property value change, we define it as a more than 10% increase in a 2-year interval. Based on the research from Drexel University Urban Heath Collaborative's study of ["A Measure of Gentrification For Use in Longitudinal Public Health Studies in the US,"](https://drexel.edu/uhc/resources/briefs/Measure-of-Gentrification-for-Use-in-Longitudinal-Public-Health-Studies-in-the-US/) it used 50% - 75% increase in home value in a 10-year interval to define gentrification and more than 75% home value increase to define intense gentrification. Therefore, transferring this criterion to our 2-year interval will be a *more than 10% increase*.  
+Secondly, for the property value change, we define it as a more than 5% increase in a 1-year interval. Based on the research from Drexel University Urban Heath Collaborative's study of ["A Measure of Gentrification For Use in Longitudinal Public Health Studies in the US,"](https://drexel.edu/uhc/resources/briefs/Measure-of-Gentrification-for-Use-in-Longitudinal-Public-Health-Studies-in-the-US/) it used 50% - 75% increase in home value in a 10-year interval to define gentrification and more than 75% home value increase to define intense gentrification. Therefore, transferring this criterion to our 2-year interval will be a *more than 10% increase*.  
+
+Since many of our criteria involves money, we need to adjust for inflation. Based on [Macrotrends](https://www.macrotrends.net/global-metrics/countries/USA/united-states/inflation-rate-cpi) data,  the inflation rate for 2017 is *2.13%*, for 2018 is *2.44%*, for 2019 is *1.81%*, for 2020 is *1.23%*.  
 
 __In summary, our method to calculate gentrification is:__    
-1. Percentage of minority group (non-white) decreases by more than 8% in a 2-year interval.  
-2. Median household income 2 years ago was below Philadelphia County's median.
-3. More than 10% increase of property value in a 2-year interval
+1. Percentage of minority group (non-white) decreases by more than 8% in a 1-year interval.  
+2. Median household income 1 years ago was below Philadelphia County's median.
+3. More than 5% increase of property value in a 1-year interval
 
 ### Census Data
 
@@ -112,10 +120,10 @@ census2019 <- get_acs(geography = "block group",
   mutate(pctNonWhite = 1 - NumberWhites / TotalPop)%>%
   select(-NAME, -B01001_001M, -B02001_002M, -B19013_001M)
 
-census2021 <- get_acs(geography = "block group", 
+census2018 <- get_acs(geography = "block group", 
           survey = "acs5",
           variables = c("B01001_001E", "B02001_002E", "B19013_001E"), 
-          year = 2021, 
+          year = 2018, 
           state = "42", 
           county = "101", 
           geometry = T, 
@@ -129,18 +137,20 @@ census2021 <- get_acs(geography = "block group",
 
 ```
 
+
 Since one of our criteria needs to compare median income to Philadelphia County's value. We need to calculate the median difference for the selected three years as well. Because some of the block groups do not have median household income value data from the census survey, we will keep the household income difference for those as NA as well.  
 
 ```{r}
 
 census2017 <- census2017 %>%
-  mutate(MedHhIncomeDif = ifelse(is.na(census2017$MedHhIncome), NA, median(na.omit(census2017$MedHhIncome)) - census2017$MedHhIncome))
+  mutate(MedHhIncomeDif = ifelse(is.na(census2017$MedHhIncome), NA, census2017$MedHhIncome - median(na.omit(census2017$MedHhIncome))))
+
+census2018 <- census2018 %>%
+  mutate(MedHhIncomeDif = ifelse(is.na(census2018$MedHhIncome), NA, census2018$MedHhIncome - median(na.omit(census2018$MedHhIncome))))
 
 census2019 <- census2019 %>%
-  mutate(MedHhIncomeDif = ifelse(is.na(census2019$MedHhIncome), NA, median(na.omit(census2019$MedHhIncome)) - census2019$MedHhIncome))
+  mutate(MedHhIncomeDif = ifelse(is.na(census2019$MedHhIncome), NA, census2019$MedHhIncome - median(na.omit(census2019$MedHhIncome))))
 
-census2017 <- census2017 %>%
-  mutate(MedHhIncomeDif = ifelse(is.na(census2017$MedHhIncome), NA, median(na.omit(census2021$MedHhIncome)) - census2017$MedHhIncome))
 
 ```
 
@@ -153,11 +163,12 @@ Since our analysis needs 2017, 2019, and 2021's data, we will first extract thes
 ```{r , include = FALSE}
 
 AssessData <- 
-  read.csv(file.path("https://opendata-downloads.s3.amazonaws.com/assessments.csv"))
+  read.csv(file.path("https://opendata-downloads.s3.amazonaws.com/assessments.csv")) 
 
 Assess2017 <- AssessData[AssessData$year == 2017, ]
+Assess2018 <- AssessData[AssessData$year == 2018, ]
 Assess2019 <- AssessData[AssessData$year == 2019, ]
-Assess2021 <- AssessData[AssessData$year == 2021, ]
+
 
 PWDparcel <- st_read("https://opendata.arcgis.com/datasets/84baed491de44f539889f2af178ad85c_0.geojson") %>%
   st_transform(crs = 2272)
@@ -167,7 +178,7 @@ PWDparcel$BRT_ID <- as.numeric(PWDparcel$BRT_ID)
 
 ```
 
-In order to match the properties/parcels in these two datasets, we use certain IDs to join them, and those are `parcel_number` in the property dataset and `BRT_ID` in the PWD parcel dataset. After joining these two dataset together, we will calculate the median property value in each census block group and add that to a new column in the census dataframe. The above process will repeat for 3 times since we need to manipulate 3 years' data.    
+In order to match the properties/parcels in these two datasets, we use certain IDs to join them, and those are `parcel_number` in the property dataset and `BRT_ID` in the PWD parcel dataset. After joining these two dataset together, we will calculate the median property value in each census block group and add that to a new column in the census dataframe. This process will repeat for 3 times since we need to manipulate 3 years' data.    
 
 
 ```{r fig.width=10}
@@ -208,37 +219,148 @@ names(median_property_value_2019)[2] <- "median_property_value"
 census2019 <- merge(census2019, median_property_value_2019, by.x = "GEOID", by.y = "Group.1", all.x = TRUE)
 
 
-# 2021
+# 2018
 
-assess_pwd_join_2021 <- inner_join(PWDparcel, Assess2021, join_by(BRT_ID == parcel_number))
+assess_pwd_join_2018 <- inner_join(PWDparcel, Assess2018, join_by(BRT_ID == parcel_number))
 
 # Perform a spatial join between the census block groups and property value data
-joined_data_2021 <- st_join(census2021, assess_pwd_join_2021, join = st_intersects)
+joined_data_2018 <- st_join(census2018, assess_pwd_join_2018, join = st_intersects)
 
 # Aggregate median property value by census block group
-median_property_value_2021 <- aggregate(joined_data_2021["market_value"], by = list(joined_data_2021$GEOID), FUN = median) %>%
+median_property_value_2018 <- aggregate(joined_data_2018["market_value"], by = list(joined_data_2018$GEOID), FUN = median) %>%
   st_drop_geometry()
 
 # Rename the aggregated column
-names(median_property_value_2021)[2] <- "median_property_value"
+names(median_property_value_2018)[2] <- "median_property_value"
 
 # Merge the aggregated median property value back to the census block groups sf object
-census2021 <- merge(census2021, median_property_value_2021, by.x = "GEOID", by.y = "Group.1", all.x = TRUE)
+census2018 <- merge(census2018, median_property_value_2018, by.x = "GEOID", by.y = "Group.1", all.x = TRUE)
 
 ```
 
-We also need to calculate the median value change in the two year intervel because our criteria to indentify gentrification is "More than 10% increase of property value in a 2-year interval."  
+### Calculate change
 
 ```{r}
 
+# 2017 to 2018
+
+census2017_pctNonwhite <- census2017 %>%
+  select(GEOID, pctNonWhite) %>%
+  st_drop_geometry() %>% 
+  rename(pctNW_2017 = pctNonWhite)
+
+census2018 <- merge(census2018, census2017_pctNonwhite, by.x = "GEOID", by.y = "GEOID", all.x = TRUE) %>%
+  mutate(NW_change_pct = (pctNonWhite - pctNW_2017) / pctNW_2017)
+
+
+# 2018 to 2019
+
+census2018_pctNonwhite <- census2018 %>%
+  select(GEOID, pctNonWhite) %>%
+  st_drop_geometry() %>% 
+  rename(pctNW_2018 = pctNonWhite)
+
+census2019 <- merge(census2019, census2018_pctNonwhite, by.x = "GEOID", by.y = "GEOID", all.x = TRUE) %>%
+  mutate(NW_change_pct = (pctNonWhite - pctNW_2018) / pctNW_2018)
+
 ```
 
+```{r}
+
+# 2017 to 2018
+
+census2017_medianHHI <- census2017 %>%
+  select(GEOID, MedHhIncomeDif) %>%
+  st_drop_geometry() %>% 
+  mutate(MedHhIBool_2017 = ifelse(is.na(census2017$MedHhIncomeDif), NA, ifelse(census2017$MedHhIncomeDif < 0, 1, 0))) %>%
+  select(GEOID, MedHhIBool_2017)
+
+census2018 <- merge(census2018, census2017_medianHHI, by.x = "GEOID", by.y = "GEOID", all.x = TRUE)
+
+
+# 2018 to 2019
+
+census2018_medianHHI <- census2018 %>%
+  select(GEOID, MedHhIncomeDif) %>%
+  st_drop_geometry() %>% 
+  mutate(MedHhIBool_2018 = ifelse(is.na(census2018$MedHhIncomeDif), NA, ifelse(census2018$MedHhIncomeDif < 0, 1, 0))) %>%
+  select(GEOID, MedHhIBool_2018)
+
+census2019 <- merge(census2019, census2018_medianHHI, by.x = "GEOID", by.y = "GEOID", all.x = TRUE)
+
+```
+
+We also need to calculate the median value change because our criteria to identify gentrification is "More than 10% increase of property value in a 2-year interval." In this way, we need to add the property value of 2017 in the 2019 dataframe and the property value of 2019 in the 2021 dataframe in order to calculate the difference.  
+
+```{r}
+
+# 2017 to 2018
+
+census2017_prop <- census2017 %>%
+  select(GEOID, median_property_value) %>%
+  st_drop_geometry() %>% 
+  rename(median_pv_2017 = median_property_value)
+
+census2018 <- merge(census2018, census2017_prop, by.x = "GEOID", by.y = "GEOID", all.x = TRUE) %>%
+  mutate(PV_change_pct = (median_property_value - median_pv_2017 * inflationAdjust2017) / median_pv_2017 * inflationAdjust2017)
+
+
+# 2018 to 2019
+
+census2018_prop <- census2018 %>%
+  select(GEOID, median_property_value) %>%
+  st_drop_geometry() %>% 
+  rename(median_pv_2018 = median_property_value)
+
+census2019 <- merge(census2019, census2018_prop, by.x = "GEOID", by.y = "GEOID", all.x = TRUE) %>%
+  mutate(PV_change_pct = (median_property_value - median_pv_2018 * inflationAdjust2018) / median_pv_2018 * inflationAdjust2018)
+
+```
 
 
 ### Combine and Visualize
 
+1. Percentage of minority group (non-white) decreases by more than 8% in a 1-year interval.  
+2. Median household income 1 years ago was below Philadelphia County's median.
+3. More than 5% increase of property value in a 1-year interval
+
+```{r fig.width=10}
+
+census2018_Gentrification <- census2018 %>%
+  select(GEOID, NW_change_pct, MedHhIBool_2017, PV_change_pct) %>%
+  mutate(Gentrification = ifelse(NW_change_pct < -0.04 & MedHhIBool_2017 == 1 & PV_change_pct > 0.05, 1, 0))
+
+census2019_Gentrification <- census2019 %>%
+  select(GEOID, NW_change_pct, MedHhIBool_2018, PV_change_pct) %>%
+  mutate(Gentrification = ifelse(NW_change_pct < -0.04 & MedHhIBool_2018 == 1 & PV_change_pct > 0.05, 1, 0))
 
 
+plot2018Gen <- ggplot() +
+  geom_sf(data = census2018_Gentrification, aes(fill=Gentrification), colour='grey') +
+  theme_void()
+
+plot2019Gen <- ggplot() +
+  geom_sf(data = census2019_Gentrification, aes(fill=Gentrification), colour='grey') +
+  theme_void()
+
+grid.arrange(
+  plot2018Gen, plot2019Gen,
+  ncol = 2  
+) 
+
+```
+
+```{r}
+
+census2019_Gentrification <- census2019 %>%
+  select(GEOID, NW_change_pct, MedHhIBool_2018, PV_change_pct) %>%
+  mutate(Gentrification = ifelse(NW_change_pct < -0.08 & PV_change_pct > 0.05, 1, 0))
+
+ggplot() +
+  geom_sf(data = census2019_Gentrification, aes(fill=Gentrification), colour=NA) +
+  theme_void()
+
+```
 
 
 ## Data Wrangling (Independent Variables)
