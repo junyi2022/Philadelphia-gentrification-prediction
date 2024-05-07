@@ -49,6 +49,9 @@ library(ggplot2)
 library(RColorBrewer)
 library(corrr)
 library(classInt)
+library(tmap)
+
+my_colors <- c("#033E56", "#518984", "#9DC9A3", "#F5CD42", "#F5A70A", "#D05A30")
 
 ```
 
@@ -92,7 +95,7 @@ census2017 <- get_acs(geography = "block group",
          NumberWhites = B02001_002E,
          MedHhIncome = B19013_001E) %>%
   mutate(pctNonWhite = 1 - NumberWhites / TotalPop)%>%
-  select(-NAME, -GEOID, -B01001_001M, -B02001_002M, -B19013_001M)
+  select(-NAME, -B01001_001M, -B02001_002M, -B19013_001M)
 
 census2019 <- get_acs(geography = "block group", 
           survey = "acs5",
@@ -107,7 +110,7 @@ census2019 <- get_acs(geography = "block group",
          NumberWhites = B02001_002E,
          MedHhIncome = B19013_001E) %>%
   mutate(pctNonWhite = 1 - NumberWhites / TotalPop)%>%
-  select(-NAME, -GEOID, -B01001_001M, -B02001_002M, -B19013_001M)
+  select(-NAME, -B01001_001M, -B02001_002M, -B19013_001M)
 
 census2021 <- get_acs(geography = "block group", 
           survey = "acs5",
@@ -122,7 +125,7 @@ census2021 <- get_acs(geography = "block group",
          NumberWhites = B02001_002E,
          MedHhIncome = B19013_001E) %>%
   mutate(pctNonWhite = 1 - NumberWhites / TotalPop)%>%
-  select(-NAME, -GEOID, -B01001_001M, -B02001_002M, -B19013_001M)
+  select(-NAME, -B01001_001M, -B02001_002M, -B19013_001M)
 
 ```
 
@@ -143,26 +146,98 @@ census2017 <- census2017 %>%
 
 ### Property Value Data
 
-The property value data used in this project comes from OpenDataPhilly's [Philadelphia Properties and Assessment History](https://opendataphilly.org/datasets/philadelphia-properties-and-assessment-history/) dataset. 
+The property value data used in this project comes from OpenDataPhilly's [Philadelphia Properties and Assessment History](https://opendataphilly.org/datasets/philadelphia-properties-and-assessment-history/) dataset. Because this dataset do not have geometry, we need to join this to the [Philadelphia Water Department's parcel data](https://opendataphilly.org/datasets/pwd-stormwater-billing-parcels/), which is originally used to calculate parcel-based stormwater charges for PWD customers under the new parcel-based stormwater billing program.   
 
-*This data updates nightly. Please ignore the 'created by' date below - the date of October 2020 shows when this webpage, not the data, was created.*
+Since our analysis needs 2017, 2019, and 2021's data, we will first extract these three years' property data from the history dataset.  
 
-```{r}
-
-OPAData <- 
-  read.csv(file.path("https://opendata-downloads.s3.amazonaws.com/opa_properties_public.csv"))
+```{r , include = FALSE}
 
 AssessData <- 
   read.csv(file.path("https://opendata-downloads.s3.amazonaws.com/assessments.csv"))
 
+Assess2017 <- AssessData[AssessData$year == 2017, ]
+Assess2019 <- AssessData[AssessData$year == 2019, ]
+Assess2021 <- AssessData[AssessData$year == 2021, ]
 
+PWDparcel <- st_read("https://opendata.arcgis.com/datasets/84baed491de44f539889f2af178ad85c_0.geojson") %>%
+  st_transform(crs = 2272)
+
+# need to change the id from character to number
+PWDparcel$BRT_ID <- as.numeric(PWDparcel$BRT_ID)
 
 ```
 
+In order to match the properties/parcels in these two datasets, we use certain IDs to join them, and those are `parcel_number` in the property dataset and `BRT_ID` in the PWD parcel dataset. After joining these two dataset together, we will calculate the median property value in each census block group and add that to a new column in the census dataframe. The above process will repeat for 3 times since we need to manipulate 3 years' data.    
+
+
+```{r fig.width=10}
+
+# 2017
+
+assess_pwd_join_2017 <- inner_join(PWDparcel, Assess2017, join_by(BRT_ID == parcel_number))
+
+# Perform a spatial join between the census block groups and property value data
+joined_data_2017 <- st_join(census2017, assess_pwd_join_2017, join = st_intersects)
+
+# Aggregate median property value by census block group
+median_property_value_2017 <- aggregate(joined_data_2017["market_value"], by = list(joined_data_2017$GEOID), FUN = median) %>%
+  st_drop_geometry()
+
+# Rename the aggregated column
+names(median_property_value_2017)[2] <- "median_property_value"
+
+# Merge the aggregated median property value back to the census block groups sf object
+census2017 <- merge(census2017, median_property_value_2017, by.x = "GEOID", by.y = "Group.1", all.x = TRUE)
+
+
+# 2019
+
+assess_pwd_join_2019 <- inner_join(PWDparcel, Assess2019, join_by(BRT_ID == parcel_number))
+
+# Perform a spatial join between the census block groups and property value data
+joined_data_2019 <- st_join(census2019, assess_pwd_join_2019, join = st_intersects)
+
+# Aggregate median property value by census block group
+median_property_value_2019 <- aggregate(joined_data_2019["market_value"], by = list(joined_data_2019$GEOID), FUN = median) %>%
+  st_drop_geometry()
+
+# Rename the aggregated column
+names(median_property_value_2019)[2] <- "median_property_value"
+
+# Merge the aggregated median property value back to the census block groups sf object
+census2019 <- merge(census2019, median_property_value_2019, by.x = "GEOID", by.y = "Group.1", all.x = TRUE)
+
+
+# 2021
+
+assess_pwd_join_2021 <- inner_join(PWDparcel, Assess2021, join_by(BRT_ID == parcel_number))
+
+# Perform a spatial join between the census block groups and property value data
+joined_data_2021 <- st_join(census2021, assess_pwd_join_2021, join = st_intersects)
+
+# Aggregate median property value by census block group
+median_property_value_2021 <- aggregate(joined_data_2021["market_value"], by = list(joined_data_2021$GEOID), FUN = median) %>%
+  st_drop_geometry()
+
+# Rename the aggregated column
+names(median_property_value_2021)[2] <- "median_property_value"
+
+# Merge the aggregated median property value back to the census block groups sf object
+census2021 <- merge(census2021, median_property_value_2021, by.x = "GEOID", by.y = "Group.1", all.x = TRUE)
+
+```
+
+We also need to calculate the median value change in the two year intervel because our criteria to indentify gentrification is "More than 10% increase of property value in a 2-year interval."  
+
+```{r}
+
+```
+
+
+
 ### Combine and Visualize
 
-Have a look at the housing price of Seattle in 2015 to have a general
-idea of the dependent variable of the model.
+
 
 
 
