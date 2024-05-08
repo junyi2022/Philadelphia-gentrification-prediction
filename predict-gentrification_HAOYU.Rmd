@@ -1,0 +1,538 @@
+---
+title: "Philadelphia Gentrification Prediction Using Machine Learning"
+author: "Junyi Yang, Ziyi Guo, Haoyu Zhu"
+date: "May, 2024"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: hide
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+Block Group:
+
+Train Model: 2017-2019 (census, housing)
+double check changes
+Validate Model: 2019-2021 (census, housing)
+depend on final performance
+
+```{r setup, include=FALSE}
+
+# You can set some global options for knitting chunks
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  cache = TRUE
+)
+
+# Load some libraries
+
+library(tidycensus)
+library(tidyverse)
+library(sf)
+library(spdep)
+library(caret)
+library(ckanr)
+library(FNN)
+library(grid)
+library(gridExtra)
+library(ggcorrplot) # plot correlation plot
+library(corrr)      # another way to plot correlation plot
+library(kableExtra)
+library(jtools)     # for regression model plots
+library(ggstance) # to support jtools plots
+library(ggpubr)    # plotting R^2 value on ggplot point scatter
+library(broom.mixed) # needed for effects plots
+library(RColorBrewer)
+library(dplyr)
+library(ggplot2)
+library(RColorBrewer)
+library(spatstat)
+library(corrr)
+library(classInt)
+
+```
+
+## Introduction
+
+## Calculate Gentrification (Dependent Variable)
+### Demographic Data
+The census data we use for this analysis is ACS 5-year data in 2015, and the geography is census tract. The demographic data we want to include in this analysis are total poplation, percentage of 
+# Visualize 
+
+Have a look at the housing price of Seattle in 2015 to have a general idea of the dependent variable of the model.
+
+```{r selected variables map}
+
+
+
+
+
+```
+
+
+## Data Wrangling (Independent Variables)
+
+### Data Gathering
+The model needs multiple spatial and non-spatial data as possible independent variable. The first step here is to collect and read those data. The list includes: (17,18)
+
+3. restaurant/grocery stores nearby
+11. housing year
+12. metro station
+1. safety-eviction  
+2. redline 
+canopy
+
+
+## Demographic characteristics
+
+1. Age (child, youth)
+2. Race (White, Black)
+3. age
+
+```{r}
+
+#2017
+Demo2017 <- get_acs(geography = "block group", 
+          survey = "acs5",
+          variables = c("B01001_001E",  
+                        # TOTALPOP
+                        
+                        "B01001_003E","B01001_004E","B01001_005E","B01001_006E","B01001_027E","B01001_028E","B01001_029E","B01001_030E",
+                        # UNDER18
+                        
+                        "B01001_007E","B01001_008E","B01001_009E","B01001_010E","B01001_011E","B01001_031E","B01001_032E","B01001_033E","B01001_034E","B01001_035E",
+                        # UNDER30
+                        
+                        "B02001_002E", "B02001_003E",
+                        # White, Black
+                        
+                        "B11016_001E","B11016_002E",
+                        #hh type, family hh
+                        
+                        "B15002_011E","B15002_028E",
+                        #Education attainment, HIGH SCHOOL
+                        
+                        "B19013_001E",
+                        #MEDIA HH INCOME
+                        
+                        "B25001_001E",
+                        #HU
+                        "B25002_002E","B25003_003E",
+                        #Occupied, RENTER OCCUPIED
+                        
+                        "B25018_001E"
+                        #MEDIAN NUMBER OF ROOMS
+                        ), 
+          year = 2017, 
+          state = "42", 
+          county = "101", 
+          geometry = T, 
+          output = "wide") %>%
+  st_transform(crs = 2272) %>%
+  rename(TotalPop = B01001_001E,
+         NumberWhites = B02001_002E,
+         NumberBlack=B02001_003E,
+         TotalHH = B11016_001E,
+         NumberFamilyHH = B11016_002E,
+         MedHHIncome = B19013_001E,
+         TotalHU=B25001_001E,
+         NumberOccupied=B25002_002E,
+         NumberRenter = B25003_003E,
+         MedNumRooms = B25018_001E) %>%
+  mutate(NumberChild=B01001_003E+B01001_004E+B01001_005E+B01001_006E+
+           B01001_027E+B01001_028E+B01001_029E+B01001_030E,
+         NumberYouth=B01001_007E+B01001_008E+B01001_009E+B01001_010E+B01001_011E+
+           B01001_031E+B01001_032E+B01001_033E+B01001_034E+B01001_035E,
+         NumberHSEducation = B15002_011E+B15002_028E )%>%
+  mutate(pctWhite=NumberWhites / TotalPop,
+         pctBlack = NumberBlack/TotalPop,
+         pctChild = NumberChild/TotalPop,
+         pctYouth = NumberYouth / TotalPop,
+         pctFamilyHH= NumberFamilyHH / TotalHH,
+         pctOccupied = NumberOccupied/TotalHU,
+         pctRent = NumberRenter / NumberOccupied)%>%
+  select(-starts_with("B"),-NAME)
+
+
+#2018
+Demo2018 <- get_acs(geography = "block group", 
+          survey = "acs5",
+          variables = c("B01001_001E",  
+                        # TOTALPOP
+                        
+                        "B01001_003E","B01001_004E","B01001_005E","B01001_006E","B01001_027E","B01001_028E","B01001_029E","B01001_030E",
+                        # UNDER18
+                        
+                        "B01001_007E","B01001_008E","B01001_009E","B01001_010E","B01001_011E","B01001_031E","B01001_032E","B01001_033E","B01001_034E","B01001_035E",
+                        # UNDER30
+                        
+                        "B02001_002E", "B02001_003E",
+                        # White, Black
+                        
+                        "B11016_001E","B11016_002E",
+                        #hh type, family hh
+                        
+                        "B15002_011E","B15002_028E",
+                        #Education attainment, HIGH SCHOOL
+                        
+                        "B19013_001E",
+                        #MEDIA HH INCOME
+                        
+                        "B25001_001E",
+                        #HU
+                        "B25002_002E","B25003_003E",
+                        #Occupied, RENTER OCCUPIED
+                        
+                        "B25018_001E"
+                        #MEDIAN NUMBER OF ROOMS
+                        ), 
+          year = 2018, 
+          state = "42", 
+          county = "101", 
+          geometry = T, 
+          output = "wide") %>%
+  st_transform(crs = 2272) %>%
+  rename(TotalPop = B01001_001E,
+         NumberWhites = B02001_002E,
+         NumberBlack=B02001_003E,
+         TotalHH = B11016_001E,
+         NumberFamilyHH = B11016_002E,
+         MedHHIncome = B19013_001E,
+         TotalHU=B25001_001E,
+         NumberOccupied=B25002_002E,
+         NumberRenter = B25003_003E,
+         MedNumRooms = B25018_001E) %>%
+  mutate(NumberChild=B01001_003E+B01001_004E+B01001_005E+B01001_006E+
+           B01001_027E+B01001_028E+B01001_029E+B01001_030E,
+         NumberYouth=B01001_007E+B01001_008E+B01001_009E+B01001_010E+B01001_011E+
+           B01001_031E+B01001_032E+B01001_033E+B01001_034E+B01001_035E,
+         NumberHSEducation = B15002_011E+B15002_028E )%>%
+  mutate(pctWhite=NumberWhites / TotalPop,
+         pctBlack = NumberBlack/TotalPop,
+         pctChild = NumberChild/TotalPop,
+         pctYouth = NumberYouth / TotalPop,
+         pctFamilyHH= NumberFamilyHH / TotalHH,
+         pctOccupied = NumberOccupied/TotalHU,
+         pctRent = NumberRenter / NumberOccupied)%>%
+  select(-starts_with("B"),-NAME)
+
+```
+
+## Amenities
+
+1. School (HIGH SCHOOL?)
+2. Park
+
+### High school
+
+Education amenities is one of the independenct variable we considered. 
+
+The school data comes from The School District of Philadelphia's [School Lists](https://www.philasd.org/performance/programsservices/open-data/school-information/#school_lists) dataset. 
+
+```{r}
+#2017
+school2017<- st_read("data/independent/2017-2018 Master School List (20180611).xlsx")
+
+#2018
+school2018<- st_read("data/independent/2018-2019 Master School List (20190510).csv")
+
+```
+
+We need to change the csv data into geom data and select the information we need. 
+
+```{r}
+
+#2017
+school2017<-school2017%>%
+  select(School.Level, GPS.Location)%>%
+  mutate(latitude = as.numeric(substring(GPS.Location, 1, regexpr(",", GPS.Location) - 1)),
+         longitude = as.numeric(substring(GPS.Location, regexpr(",", GPS.Location) + 1)))%>%
+  st_as_sf(., coords = c("longitude", "latitude"), crs = 4326)%>%
+  st_transform(crs = 2272)
+  
+#2018
+school2018<-school2018%>%
+  select(School.Level, GPS.Location)%>%
+  mutate(latitude = as.numeric(substring(GPS.Location, 1, regexpr(",", GPS.Location) - 1)),
+         longitude = as.numeric(substring(GPS.Location, regexpr(",", GPS.Location) + 1)))%>%
+  st_as_sf(., coords = c("longitude", "latitude"), crs = 4326)%>%
+  st_transform(crs = 2272)
+
+```
+
+
+```{r}
+
+#2017
+block_buffer2017 <- st_buffer(Demo2017, dist = 1000)
+
+#2018
+block_buffer2018 <- st_buffer(Demo2018, dist = 1000)
+
+```
+
+```{r}
+
+#2017
+school_block2017 <- st_join(school2017, block_buffer2017) %>%
+  group_by(GEOID) %>%
+  summarise(school = n())%>%
+  st_drop_geometry()
+
+data2017<-Demo2017%>%
+  left_join(.,school_block2017, by ="GEOID")%>%
+  mutate(school = replace_na(school, 0))
+
+#2018
+school_block2018 <- st_join(school2018, block_buffer2018) %>%
+  group_by(GEOID) %>%
+  summarise(school = n())%>%
+  st_drop_geometry()
+
+data2018<-Demo2018%>%
+  left_join(.,school_block2018, by ="GEOID")%>%
+  mutate(school = replace_na(school, 0))
+
+```
+
+## Park
+
+```{r}
+
+park<- st_read("data/independent/PPR_Program_Sites.geojson")%>%
+  st_transform(crs = 2272)
+
+```
+
+```{r}
+
+#2017
+park_block2017 <- st_join(park, block_buffer2017) %>%
+  group_by(GEOID) %>%
+  summarise(park = n())%>%
+  st_drop_geometry()
+
+data2017<-data2017%>%
+  left_join(.,park_block2017, by ="GEOID")%>%
+  mutate(park = replace_na(park, 0))
+
+#2018
+park_block2018 <- st_join(park, block_buffer2018) %>%
+  group_by(GEOID) %>%
+  summarise(park = n())%>%
+  st_drop_geometry()
+
+data2018<-data2018%>%
+  left_join(.,park_block2018, by ="GEOID")%>%
+  mutate(park = replace_na(park, 0))
+
+```
+
+
+### Safety
+
+```{r}
+
+#2017
+crime2017<- st_read("data/independent/incidents_part1_part2_2017/incidents_part1_part2.shp")%>%
+  st_transform(crs = 2272)%>%
+  filter(grepl("Burglary", text_gener))
+
+#2018
+crime2018<- st_read("data/independent/incidents_part1_part2_2018/incidents_part1_part2.shp")%>%
+  st_transform(crs = 2272)%>%
+  filter(grepl("Burglary", text_gener))
+
+```
+
+```{r}
+
+#2017
+crime_block2017 <- st_join(crime2017, Demo2017) %>%
+  group_by(GEOID) %>%
+  summarise(Burglary = n())%>%
+  st_drop_geometry()
+
+data2017<-data2017%>%
+  left_join(.,crime_block2017, by ="GEOID")%>%
+  mutate(Burglary = replace_na(Burglary, 0))
+
+#2018
+crime_block2018 <- st_join(crime2018, Demo2018) %>%
+  group_by(GEOID) %>%
+  summarise(Burglary = n())%>%
+  st_drop_geometry()
+
+data2018<-data2018%>%
+  left_join(.,crime_block2018, by ="GEOID")%>%
+  mutate(Burglary = replace_na(Burglary, 0))
+
+
+```
+
+### Redlining
+
+```{r}
+
+Redline <- st_read("data/independent/redlining.geojson")%>%
+  st_transform(crs = 2272)
+
+```
+
+```{r}
+
+Redline_block <- st_join(Demo2017, Redline) %>%
+  select(GEOID, holc_grade)%>%
+  mutate(holc_number = case_when(
+  holc_grade == "Commercial" ~ 0,
+  holc_grade == "A" ~ 1,
+  holc_grade == "B" ~ 2,
+  holc_grade == "C" ~ 3,
+  holc_grade == "D" ~ 4,
+  TRUE ~ NA
+))%>%
+  group_by(GEOID) %>%
+  summarise(holc_number = max(holc_number))%>%
+  st_drop_geometry()
+
+#2017
+data2017<-data2017%>%
+  left_join(.,Redline_block, by ="GEOID")
+  
+#2018
+data2018<-data2018%>%
+  left_join(.,Redline_block, by ="GEOID")
+
+```
+
+
+### Data Processing
+count / nearest neighbors / buffer
+#### Safety data
+
+```{r}
+
+
+```
+
+
+#### Amenities Data
+The amenities data we used includes 
+
+```{r}
+
+
+```
+
+
+
+#### Canopy Data
+
+```{r}
+
+
+
+```
+
+#### Data
+
+
+```{r}
+
+
+```
+
+
+## Summarize and preview the variables
+
+The table shows all the independent variables by categories.
+
+```{r preview the data}
+
+
+```
+
+
+
+## Model development
+methodology explanation
+
+### Analyzing associations
+An overview of the association between gentrification and multiple independent variables
+```{r Correlation, fig.height=7, fig.width=10}
+
+
+
+```
+
+
+### Correlation matrix
+
+
+```{r fig.height=10, fig.width=10}
+
+
+
+```
+
+
+
+### Multivariate Regression
+
+Construct baseline model
+```{r mutlivariate_regression}
+
+
+
+```
+
+
+
+## Model testing
+cross validation
+```{r }
+
+
+```
+over/under predict location
+### Mean Absolute Percentage Error
+```{r }
+
+
+```
+
+
+
+### Cross validation
+
+
+```{r}
+
+
+```
+### Result of model testing
+
+## Validation
+history data
+```{r}
+
+
+```
+
+### Summary
+why invest
+recommendation for implementation
+
+### Appendix
+data souce, variable defination, model specification
+
+
+
+
