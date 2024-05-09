@@ -565,42 +565,23 @@ school2018<-school2018%>%
 
 ```
 
-
 ```{r}
 
 #2017
-block_buffer2017 <- st_buffer(Demo2017, dist = 1000)
+school_block2017 <- st_join(school2017, Demo2017) %>%
+  group_by(GEOID) %>%
+  summarise(school = n()) %>%
+  st_drop_geometry() 
 
 #2018
-block_buffer2018 <- st_buffer(Demo2018, dist = 1000)
+school_block2018 <- st_join(school2018, Demo2018) %>%
+  group_by(GEOID) %>%
+  summarise(school = n())%>%
+  st_drop_geometry() 
 
 ```
 
-```{r}
-
-#2017
-school_block2017 <- st_join(school2017, block_buffer2017) %>%
-  group_by(GEOID) %>%
-  summarise(school = n())%>%
-  st_drop_geometry()
-
-data2017<-Demo2017%>%
-  left_join(.,school_block2017, by ="GEOID")%>%
-  mutate(school = replace_na(school, 0))
-
-#2018
-school_block2018 <- st_join(school2018, block_buffer2018) %>%
-  group_by(GEOID) %>%
-  summarise(school = n())%>%
-  st_drop_geometry()
-
-data2018<-Demo2018%>%
-  left_join(.,school_block2018, by ="GEOID")%>%
-  mutate(school = replace_na(school, 0))
-
-```
-
-## Park
+### Park
 
 ```{r}
 
@@ -612,29 +593,51 @@ park<- st_read("data/independent/PPR_Program_Sites.geojson")%>%
 ```{r}
 
 #2017
-park_block2017 <- st_join(park, block_buffer2017) %>%
+park_block2017 <- st_join(park, 
+                             st_buffer(Demo2017, dist = 500)) %>%
   group_by(GEOID) %>%
   summarise(park = n())%>%
-  st_drop_geometry()
-
-data2017<-data2017%>%
-  left_join(.,park_block2017, by ="GEOID")%>%
-  mutate(park = replace_na(park, 0))
+  st_drop_geometry() 
 
 #2018
-park_block2018 <- st_join(park, block_buffer2018) %>%
+
+park_block2018 <- st_join(park, 
+                             st_buffer(Demo2017, dist = 500)) %>%
   group_by(GEOID) %>%
   summarise(park = n())%>%
-  st_drop_geometry()
+  st_drop_geometry() 
 
-data2018<-data2018%>%
-  left_join(.,park_block2018, by ="GEOID")%>%
-  mutate(park = replace_na(park, 0))
+```
+
+### Metro Station
+
+```{r}
+
+station <- st_read("data/independent/Highspeed_Stations.geojson")%>%
+  st_transform(crs=2272)
+
+```
+
+```{r}
+
+#2017
+station_block2017 <- st_join(station, 
+                             Demo2017) %>%
+  group_by(GEOID) %>%
+  summarise(station = n())%>%
+  st_drop_geometry() 
+
+#2018
+station_block2018 <- st_join(station, 
+                             Demo2018) %>%
+  group_by(GEOID) %>%
+  summarise(station = n())%>%
+  st_drop_geometry() 
 
 ```
 
 
-### Safety
+## Safety
 
 ```{r}
 
@@ -658,20 +661,11 @@ crime_block2017 <- st_join(crime2017, Demo2017) %>%
   summarise(Burglary = n())%>%
   st_drop_geometry()
 
-data2017<-data2017%>%
-  left_join(.,crime_block2017, by ="GEOID")%>%
-  mutate(Burglary = replace_na(Burglary, 0))
-
 #2018
 crime_block2018 <- st_join(crime2018, Demo2018) %>%
   group_by(GEOID) %>%
   summarise(Burglary = n())%>%
   st_drop_geometry()
-
-data2018<-data2018%>%
-  left_join(.,crime_block2018, by ="GEOID")%>%
-  mutate(Burglary = replace_na(Burglary, 0))
-
 
 ```
 
@@ -709,20 +703,61 @@ Redline_block <- st_join(Demo2017, Redline) %>%
 ))%>%
   select(-holc_number)
 
-#2017
-data2017<-data2017%>%
-  left_join(.,Redline_block, by ="GEOID")
-  
-#2018
-data2018<-data2018%>%
-  left_join(.,Redline_block, by ="GEOID")
-
 ```
 
 
 ## Summarize and preview the variables
 
 The table shows all the independent variables by categories.
+
+```{r}
+
+#2017
+data2017<-Demo2017%>%
+  left_join(.,school_block2017, by ="GEOID")%>% 
+  left_join(.,park_block2017, by ="GEOID")%>%  
+  left_join(.,station_block2017, by ="GEOID")%>% 
+  left_join(.,crime_block2017, by ="GEOID")%>% 
+  left_join(.,Redline_block, by ="GEOID")
+  
+#2018
+data2018<-Demo2018%>%
+  left_join(.,school_block2018, by ="GEOID")%>%  
+  left_join(.,park_block2018, by ="GEOID")%>% 
+  left_join(.,station_block2018, by ="GEOID")%>%  
+  left_join(.,crime_block2018, by ="GEOID")%>% 
+  left_join(.,Redline_block, by ="GEOID")
+  
+
+```
+
+```{r}
+
+#2017
+
+data2017 <- data2017%>%
+  mutate(school = replace_na(school, 0)) %>%
+  mutate(school.factor= case_when(  school == 0 ~ "0",  school == 1 ~ "1",  school == 2 ~ "2",  school > 2 ~"over 2"))%>%
+  mutate(park = replace_na(park, 0)) %>%
+  mutate(park.factor= case_when(  park == 0 ~ "0",  park == 1 ~ "1",  park == 2 ~ "2",  park > 2 ~"over 2")) %>%
+  mutate(station = replace_na(station, 0) )%>%
+  mutate(station.factor= case_when(  station == 0 ~ "0",  station == 1 ~ "1",  station > 1 ~"over 1")) %>%
+  mutate(Burglary = replace_na(Burglary, 0) )
+
+
+#2018
+data2018 <- data2018%>%
+  mutate(school = replace_na(school, 0)) %>%
+  mutate(school.factor= case_when(  school == 0 ~ "0",  school == 1 ~ "1",  school == 2 ~ "2",  school > 2 ~"over 2"))%>%
+  mutate(park = replace_na(park, 0)) %>%
+  mutate(park.factor= case_when(  park == 0 ~ "0",  park == 1 ~ "1",  park == 2 ~ "2",  park > 2 ~"over 2")) %>%
+  mutate(station = replace_na(station, 0) )%>%
+  mutate(station.factor= case_when(  station == 0 ~ "0",  station == 1 ~ "1",  station > 1 ~"over 1")) %>%
+  mutate(Burglary = replace_na(Burglary, 0) ) 
+
+```
+
+
 
 ```{r preview the data}
 
@@ -764,9 +799,6 @@ Gentrification.test <- data2018[-inTrain,]
 
 ```
 
-
-
-
 ### Analyzing associations
 
 An overview of the association between gentrification and multiple
@@ -774,43 +806,46 @@ independent variables
 
 ```{r Correlation, fig.height=7, fig.width=10}
 
+model <- glm(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+                school+park+station.factor+Burglary+holc_grade, 
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
 
+stargazer(model,
+          title = "Model",
+          type = "text",
+          digits = 2,
+          no.space = TRUE)
 
 ```
 
 ### Correlation matrix
 
-```{r fig.height=10, fig.width=10}
+We want a better sensitivity. A good sensitivity means that our model could correctly identify  True Positive, the gentrification block groups. Effective sensitivity empowers governments to implement targeted interventions in these areas, mitigating or reducing future gentrification.
+
+We employ a threshold of 0.45 to optimize the balance between cost and benefit. This threshold selection aims to gain a balance where the costs associated with false positives and false negatives are minimized while maximizing the benefits of correctly identifying gentrification cases.[Appendix]
 
 
+```{r}
 
-```
-
-### Multivariate Regression
-
-Construct baseline model
-
-```{r mutlivariate_regression}
-
-
+testProbs <- data.frame(Outcome = as.factor(Gentrification.test$Gentrification),
+                        Probs = predict(model, Gentrification.test, type= "response"))
 
 ```
 
-## Model testing
+```{r}
 
-cross validation
-
-```{r }
-
+testProbs <- 
+  testProbs %>%
+  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.45 , 1, 0)))
 
 ```
 
-over/under predict location 
+```{r}
 
-### Mean Absolute Percentage Error
-
-```{r }
-
+caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
+                       positive = "1")
 
 ```
 
@@ -818,8 +853,44 @@ over/under predict location
 
 ```{r}
 
+data2018$Gentrification <- as.factor(data2018$Gentrification)
+
+levels(data2018$Gentrification) <- make.names(levels(data2018$Gentrification))
+
+
+ctrl <- trainControl(
+  method = "cv",
+  number = 100,
+  classProbs = TRUE, 
+  summaryFunction = twoClassSummary
+)
+
+cvFit <- train(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+                school+park+station.factor+Burglary+holc_grade,
+  data = data2018 %>%
+    dplyr::select(-GEOID, -geometry),
+  method = "glm",
+  family = "binomial",
+  metric = "ROC",
+  trControl = ctrl
+)
+
+cvFit
 
 ```
+
+### ROC Curve
+
+```{r}
+
+ggplot(testProbs, aes(d = as.numeric(Outcome), m = Probs)) +
+  geom_roc(n.cuts = 50, labels = TRUE, colour = "#FF82AB") +
+  style_roc(theme = theme_grey) +
+  geom_abline(slope = 1, intercept = 0, size = 1.5, color = 'grey') +
+  labs(title = "ROC Curve")+theme_minimal()
+
+```
+
 
 ### Result of model testing
 
@@ -842,24 +913,214 @@ data source, variable definition, model specification
 
 #### Model specification
 
+```{r}
+
+numericVars <- data2018 %>%
+  st_drop_geometry() %>%  
+  select_if(is.numeric) %>% 
+  na.omit() 
+
+correlation_matrix <- cor(numericVars)
+
+numericVars %>% 
+  correlate() %>% 
+  autoplot() +
+  geom_text(aes(label = round(r,digits=2)),size = 2)
+
+```
+
+
 ##### Basic model
 
 ```{r}
 
-model1 <- glm(Gentrification ~ ., 
+model1 <- glm(Gentrification ~ MedHHIncome+MedNumRooms+pctWhite+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation,
              data = as.data.frame(Gentrification.training) %>% 
                      dplyr::select(-GEOID, -geometry),
                   family="binomial" (link="logit"))
-summary(model1)
+
+model2 <- glm(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation, 
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
+
+model3 <- glm(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+                school+park, 
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
+
+model4 <- glm(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+                school+park+station, 
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
+
+model5 <- glm(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+                school+park+station+Burglary+holc_grade, 
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
+
+model6 <- glm(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+                school+park+station.factor+Burglary+holc_grade, 
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
+
+model7 <- glm(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+                school.factor+park+station.factor+Burglary+holc_grade, 
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
+
+model8 <- glm(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+                school.factor+park.factor+station.factor+Burglary+holc_grade, 
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
 
 ```
 
 ```{r}
 
-testProbs <- data.frame(Outcome = as.factor(Gentrification.test$Gentrification),
-                        Probs = predict(model1, Gentrification.test, type= "response"))
+modelList <- paste0("model", 1:8)
+map_dfc(modelList, function(x)pR2(get(x)))[4,] %>%
+  setNames(paste0("model",1:8)) %>%
+  gather(model,McFadden) %>%
+  ggplot(aes(model,McFadden)) +
+    geom_bar(stat="identity") +
+    labs(title= "McFadden R-Squared by Model") 
 
 ```
+
+### Cross validation
+
+```{r}
+
+data2018$Gentrification <- as.factor(data2018$Gentrification)
+
+levels(data2018$Gentrification) <- make.names(levels(data2018$Gentrification))
+
+
+ctrl <- trainControl(
+  method = "cv",
+  number = 100,
+  classProbs = TRUE, 
+  summaryFunction = twoClassSummary
+)
+
+#model5
+cvFit <- train(
+  Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+                school+park+station+Burglary+holc_grade,
+  data = data2018 %>%
+    dplyr::select(-GEOID, -geometry),
+  method = "glm",
+  family = "binomial",
+  metric = "ROC",
+  trControl = ctrl
+)
+
+cvFit
+
+```
+
+```{r}
+
+#model6
+cvFit <- train(
+  Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+                school+park+station.factor+Burglary+holc_grade,
+  data = data2018 %>%
+    dplyr::select(-GEOID, -geometry),
+  method = "glm",
+  family = "binomial",
+  metric = "ROC",
+  trControl = ctrl
+)
+
+cvFit
+
+```
+
+```{r}
+
+#model7
+cvFit <- train(
+  Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+                school.factor+park+station.factor+Burglary+holc_grade,
+  data = data2018 %>%
+    dplyr::select(-GEOID, -geometry),
+  method = "glm",
+  family = "binomial",
+  metric = "ROC",
+  trControl = ctrl
+)
+
+cvFit
+
+```
+
+```{r}
+
+#model8
+cvFit <- train(
+  Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+                school.factor+park.factor+station.factor+Burglary+holc_grade,
+  data = data2018 %>%
+    dplyr::select(-GEOID, -geometry),
+  method = "glm",
+  family = "binomial",
+  metric = "ROC",
+  trControl = ctrl
+)
+
+cvFit
+
+```
+
+choose model6 as our best model
+
+### Make Predictions
+```{r}
+
+testProbs <- data.frame(Outcome = as.factor(Gentrification.test$Gentrification),
+                        Probs = predict(model6, Gentrification.test, type= "response"))
+
+```
+
+```{r}
+
+ggplot(testProbs, aes(x = Probs, fill = as.factor(Outcome))) + 
+  geom_density() +
+  facet_grid(Outcome ~ .) +
+  scale_fill_manual(values = c("pink","purple")) +
+  labs(x = "Click", y = "Density of probabilities",
+       title = "Distribution of predicted probabilities by observed outcome") +
+  theme(strip.text.x = element_text(size = 18),
+        legend.position = "none")
+
+```
+
+### Confusion Matrix
+
+```{r}
+
+testProbs <- 
+  testProbs %>%
+  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.5 , 1, 0)))
+
+```
+
+```{r}
+
+caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
+                       positive = "1")
+
+```
+
+### ROC Curve
 
 ```{r}
 
@@ -871,6 +1132,110 @@ ggplot(testProbs, aes(d = as.numeric(Outcome), m = Probs)) +
 
 ```
 
+
+### Need to adjust threshold
+
+```{r}
+
+options(yardstick.event_first = FALSE)
+
+testProbs <- 
+  testProbs %>% 
+  mutate(predClass_50 = as.factor(ifelse(testProbs$Probs > 0.5 , 1, 0)),
+         predClass_45 = as.factor(ifelse(testProbs$Probs > 0.45 , 1, 0)),
+         predClass_20 = as.factor(ifelse(testProbs$Probs > 0.2 , 1, 0)),
+         predClass_15 = as.factor(ifelse(testProbs$Probs > 0.15 , 1, 0))) 
+
+testProbs %>%
+  dplyr::select(-Probs) %>%
+  gather(Variable, Value, -Outcome) %>%
+  group_by(Variable) %>%
+  summarize(Sensitivity = round(yardstick::sens_vec(Outcome,factor(Value)),2),
+            Specificity = round(yardstick::spec_vec(Outcome,factor(Value)),2),
+            Accuracy = round(yardstick::accuracy_vec(Outcome,factor(Value)),2)) %>% 
+  kable() %>%
+  kable_styling(full_width = F)
+
+```
+
+
+```{r}
+
+## When gentrification occurs, housing prices increase by $500 per unit. 
+## Investing in affordable housing to mitigate gentrification costs $800 per unit. 
+
+
+cost_benefit_table <-
+   testProbs %>%
+      count(predOutcome, Outcome) %>%
+      summarize(True_Negative = sum(n[predOutcome==0 & Outcome==0]),
+                True_Positive = sum(n[predOutcome==1 & Outcome==1]),
+                False_Negative = sum(n[predOutcome==0 & Outcome==1]),
+                False_Positive = sum(n[predOutcome==1 & Outcome==0])) %>%
+       gather(Variable, Count) %>%
+       mutate(Revenue =
+               ifelse(Variable == "True_Negative", Count * 0,
+               ifelse(Variable == "True_Positive",((0.8 - 0.5) * Count),
+               ifelse(Variable == "False_Negative", (-0.5) * Count,
+               ifelse(Variable == "False_Positive", (-.8) * Count, 0))))) %>%
+    bind_cols(data.frame(Description = c(
+              "We correctly predicted no Gentrification",
+              "We correctly predicted Gentrification",
+              "We predicted no Gentrification and the block group Gentrified",
+              "We predicted Gentrification and the block group did not Gentrify")))
+
+kable(cost_benefit_table,
+       caption = "Cost/Benefit Table") %>% kable_styling()
+
+```
+
+```{r}
+
+iterateThresholds <- function(data) {
+  x = .01
+  all_prediction <- data.frame()
+  while (x <= 1) {
+  
+  this_prediction <-
+      testProbs %>%
+      mutate(predOutcome = ifelse(Probs > x, 1, 0)) %>%
+      count(predOutcome, Outcome) %>%
+      summarize(True_Negative = sum(n[predOutcome==0 & Outcome==0]),
+                True_Positive = sum(n[predOutcome==1 & Outcome==1]),
+                False_Negative = sum(n[predOutcome==0 & Outcome==1]),
+                False_Positive = sum(n[predOutcome==1 & Outcome==0])) %>%
+     gather(Variable, Count) %>%
+     mutate(Revenue =
+               ifelse(Variable == "True_Negative", Count * 0,
+               ifelse(Variable == "True_Positive",((.8 - .5) * Count),
+               ifelse(Variable == "False_Negative", (-0.5) * Count,
+               ifelse(Variable == "False_Positive", (-0.8) * Count, 0)))),
+            Threshold = x)
+  
+  all_prediction <- rbind(all_prediction, this_prediction)
+  x <- x + .01
+  }
+return(all_prediction)
+}
+
+```
+
+```{r}
+
+whichThreshold <- iterateThresholds(testProbs2)
+
+whichThreshold_revenue <- 
+whichThreshold %>% 
+    group_by(Threshold) %>% 
+    summarize(Revenue = sum(Revenue))
+
+  ggplot(whichThreshold_revenue)+
+  geom_line(aes(x = Threshold, y = Revenue))+
+  geom_vline(xintercept =  pull(arrange(whichThreshold_revenue, -Revenue)[1,1]))+
+    labs(title = "Model Revenues By Threshold For Test Sample",
+         subtitle = "Vertical Line Denotes Optimal Threshold")
+
+```
 
 
 #### References
