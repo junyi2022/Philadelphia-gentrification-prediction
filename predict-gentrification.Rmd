@@ -894,14 +894,6 @@ ggplot(testProbs, aes(d = as.numeric(Outcome), m = Probs)) +
 
 ### Result of model testing
 
-## Validation
-
-history data
-
-```{r}
-
-
-```
 
 ### Summary
 
@@ -1234,6 +1226,38 @@ whichThreshold %>%
   geom_vline(xintercept =  pull(arrange(whichThreshold_revenue, -Revenue)[1,1]))+
     labs(title = "Model Revenues By Threshold For Test Sample",
          subtitle = "Vertical Line Denotes Optimal Threshold")
+
+```
+### Validation
+
+Validate using the 2017 Data
+and compared with the 2018 model results
+
+```{r Validation}
+data2017 <-data2017%>%
+  left_join(.,
+            census2018_Gentrification%>%
+              st_drop_geometry()%>%
+              select(GEOID,Gentrification), 
+            by ="GEOID")%>%
+  na.omit(Gentrification)
+
+data2017$Gentrification <- as.factor(data2017$Gentrification)
+
+levels(data2017$Gentrification) <- make.names(levels(data2017$Gentrification))
+
+```
+
+```{r Prediction by 2017}
+
+# Predict probabilities
+predictions <- predict(model6, data2017, type = "response")
+
+roc_curve <- roc(data2017$Gentrification, predictions)
+auc(roc_curve)
+
+# Plot ROC curve
+plot(roc_curve, main = "ROC Curve")
 
 ```
 
