@@ -370,24 +370,30 @@ grid.arrange(
 
 ## Data Wrangling (Independent Variables)
 
-### Data Gathering
-
-### Data Gathering
 The model needs multiple spatial and non-spatial data as possible independent variable. The first step here is to collect and read those data. The list includes: (17,18)
 
-3. restaurant/grocery stores nearby
-11. housing year
-12. metro station
-1. safety-eviction  
-2. redline 
-canopy
-
-
-## Demographic characteristics
-
-1. Age (child, youth)
+$Demographic and Housing characteristics$
+1. Age (youth)
 2. Race (White, Black)
-3. age
+3. Geographical Mobility: different housing 1 years ago
+4. Family structure
+5. Bachelor Degree Attainment
+6. Occupied Rate/ Renter Rate
+7. Housing Structure
+8. Median HH Income
+
+$Amenities$
+9. School
+10. Parks
+11. Metro Station
+
+$Safety$
+12. Burglary
+
+$Redlining$
+13. Redlining
+
+### Demographic and Housing characteristics
 
 ```{r}
 
@@ -397,31 +403,33 @@ Demo2017 <- get_acs(geography = "block group",
           variables = c("B01001_001E",  
                         # TOTALPOP
                         
-                        "B01001_003E","B01001_004E","B01001_005E","B01001_006E","B01001_027E","B01001_028E","B01001_029E","B01001_030E",
-                        # UNDER18
-                        
-                        "B01001_007E","B01001_008E","B01001_009E","B01001_010E","B01001_011E","B01001_031E","B01001_032E","B01001_033E","B01001_034E","B01001_035E",
-                        # UNDER30
+                        "B01001_007E","B01001_008E","B01001_009E","B01001_010E","B01001_011E",
+                        "B01001_031E","B01001_032E","B01001_033E","B01001_034E","B01001_035E",
+                        # 18-30
                         
                         "B02001_002E", "B02001_003E",
                         # White, Black
                         
-                        "B11016_001E","B11016_002E",
-                        #hh type, family hh
+                        "B07201_001E","B07201_002E",
+                        #Same house
                         
-                        "B15002_011E","B15002_028E",
-                        #Education attainment, HIGH SCHOOL
+                        "B11016_001E","B11016_009E",
+                        #hh type, non-family hh
                         
-                        "B19013_001E",
-                        #MEDIA HH INCOME
+                        "B15002_015E","B15002_016E","B15002_017E","B15002_018E",
+                        "B15002_032E","B15002_033E","B15002_034E","B15002_035E",
+                        #Education attainment, Bachelor Degree
                         
                         "B25001_001E",
                         #HU
                         "B25002_002E","B25003_003E",
                         #Occupied, RENTER OCCUPIED
                         
-                        "B25018_001E"
+                        "B25018_001E",
                         #MEDIAN NUMBER OF ROOMS
+                        
+                        "B19013_001E"
+                        #MEDIAN HH INCOME
                         ), 
           year = 2017, 
           state = "42", 
@@ -433,27 +441,26 @@ Demo2017 <- get_acs(geography = "block group",
          NumberWhites = B02001_002E,
          NumberBlack=B02001_003E,
          TotalHH = B11016_001E,
-         NumberFamilyHH = B11016_002E,
-         MedHHIncome = B19013_001E,
+         NumbernonFamilyHH = B11016_009E,
          TotalHU=B25001_001E,
          NumberOccupied=B25002_002E,
          NumberRenter = B25003_003E,
-         MedNumRooms = B25018_001E) %>%
-  mutate(NumberChild=B01001_003E+B01001_004E+B01001_005E+B01001_006E+
-           B01001_027E+B01001_028E+B01001_029E+B01001_030E,
-         NumberYouth=B01001_007E+B01001_008E+B01001_009E+B01001_010E+B01001_011E+
+         MedNumRooms = B25018_001E,
+         MedHhIncome = B19013_001E) %>%
+  mutate(NumberYouth=B01001_007E+B01001_008E+B01001_009E+B01001_010E+B01001_011E+
            B01001_031E+B01001_032E+B01001_033E+B01001_034E+B01001_035E,
-         NumberHSEducation = B15002_011E+B15002_028E )%>%
+         NumberBachelor = B15002_015E+B15002_016E+B15002_017E+B15002_018E+
+                        B15002_032E+B15002_033E+B15002_034E+B15002_035E )%>%
   mutate(pctWhite=NumberWhites / TotalPop,
          pctBlack = NumberBlack/TotalPop,
-         pctChild = NumberChild/TotalPop,
          pctYouth = NumberYouth / TotalPop,
-         pctFamilyHH= NumberFamilyHH / TotalHH,
+         prcMove = 1-(B07201_002E/B07201_001E),
+         pctnonFamilyHH= NumbernonFamilyHH / TotalHH,
          pctOccupied = NumberOccupied/TotalHU,
          pctRent = NumberRenter / NumberOccupied,
-         pctHSEducation = NumberHSEducation / TotalPop)%>%
-  select(-starts_with("B"),-NAME,-TotalPop,-NumberWhites,-NumberBlack,-TotalHH,-NumberFamilyHH,-TotalHU,
-         -NumberOccupied,-NumberRenter,-NumberChild,-NumberYouth,-NumberHSEducation)
+         pctBachelor = NumberBachelor / TotalPop)%>%
+  select(-starts_with("B"),-NAME,-TotalPop,-NumberWhites,-NumberBlack,-TotalHH,-NumbernonFamilyHH,-TotalHU,
+         -NumberOccupied,-NumberRenter,-NumberYouth,-NumberBachelor)
 
 
 #2018
@@ -462,31 +469,33 @@ Demo2018 <- get_acs(geography = "block group",
           variables = c("B01001_001E",  
                         # TOTALPOP
                         
-                        "B01001_003E","B01001_004E","B01001_005E","B01001_006E","B01001_027E","B01001_028E","B01001_029E","B01001_030E",
-                        # UNDER18
-                        
-                        "B01001_007E","B01001_008E","B01001_009E","B01001_010E","B01001_011E","B01001_031E","B01001_032E","B01001_033E","B01001_034E","B01001_035E",
-                        # UNDER30
+                        "B01001_007E","B01001_008E","B01001_009E","B01001_010E","B01001_011E",
+                        "B01001_031E","B01001_032E","B01001_033E","B01001_034E","B01001_035E",
+                        # 18-30
                         
                         "B02001_002E", "B02001_003E",
                         # White, Black
                         
-                        "B11016_001E","B11016_002E",
-                        #hh type, family hh
+                        "B07201_001E","B07201_002E",
+                        #Same house
                         
-                        "B15002_011E","B15002_028E",
-                        #Education attainment, HIGH SCHOOL
+                        "B11016_001E","B11016_009E",
+                        #hh type, non-family hh
                         
-                        "B19013_001E",
-                        #MEDIA HH INCOME
+                        "B15002_015E","B15002_016E","B15002_017E","B15002_018E",
+                        "B15002_032E","B15002_033E","B15002_034E","B15002_035E",
+                        #Education attainment, Bachelor Degree
                         
                         "B25001_001E",
                         #HU
                         "B25002_002E","B25003_003E",
                         #Occupied, RENTER OCCUPIED
                         
-                        "B25018_001E"
+                        "B25018_001E",
                         #MEDIAN NUMBER OF ROOMS
+                        
+                        "B19013_001E"
+                        #MEDIAN HH INCOME
                         ), 
           year = 2018, 
           state = "42", 
@@ -498,38 +507,34 @@ Demo2018 <- get_acs(geography = "block group",
          NumberWhites = B02001_002E,
          NumberBlack=B02001_003E,
          TotalHH = B11016_001E,
-         NumberFamilyHH = B11016_002E,
-         MedHHIncome = B19013_001E,
+         NumbernonFamilyHH = B11016_009E,
          TotalHU=B25001_001E,
          NumberOccupied=B25002_002E,
          NumberRenter = B25003_003E,
-         MedNumRooms = B25018_001E) %>%
-  mutate(NumberChild=B01001_003E+B01001_004E+B01001_005E+B01001_006E+
-           B01001_027E+B01001_028E+B01001_029E+B01001_030E,
-         NumberYouth=B01001_007E+B01001_008E+B01001_009E+B01001_010E+B01001_011E+
+         MedNumRooms = B25018_001E,
+         MedHhIncome = B19013_001E) %>%
+  mutate(NumberYouth=B01001_007E+B01001_008E+B01001_009E+B01001_010E+B01001_011E+
            B01001_031E+B01001_032E+B01001_033E+B01001_034E+B01001_035E,
-         NumberHSEducation = B15002_011E+B15002_028E )%>%
+         NumberBachelor = B15002_015E+B15002_016E+B15002_017E+B15002_018E+
+                        B15002_032E+B15002_033E+B15002_034E+B15002_035E )%>%
   mutate(pctWhite=NumberWhites / TotalPop,
          pctBlack = NumberBlack/TotalPop,
-         pctChild = NumberChild/TotalPop,
          pctYouth = NumberYouth / TotalPop,
-         pctFamilyHH= NumberFamilyHH / TotalHH,
+         prcMove = 1-(B07201_002E/B07201_001E),
+         pctnonFamilyHH= NumbernonFamilyHH / TotalHH,
          pctOccupied = NumberOccupied/TotalHU,
          pctRent = NumberRenter / NumberOccupied,
-         pctHSEducation = NumberHSEducation / TotalPop)%>%
-  select(-starts_with("B"),-NAME,-TotalPop,-NumberWhites,-NumberBlack,-TotalHH,-NumberFamilyHH,-TotalHU,
-         -NumberOccupied,-NumberRenter,-NumberChild,-NumberYouth,-NumberHSEducation)
+         pctBachelor = NumberBachelor / TotalPop)%>%
+  select(-starts_with("B"),-NAME,-TotalPop,-NumberWhites,-NumberBlack,-TotalHH,-NumbernonFamilyHH,-TotalHU,
+         -NumberOccupied,-NumberRenter,-NumberYouth,-NumberBachelor)
 
 ```
 
-## Amenities
+### Amenities
 
-1. School (HIGH SCHOOL?)
-2. Park
+#### School
 
-### High school
-
-Education amenities is one of the independenct variable we considered. 
+Education amenities is one of the independent variable we considered. 
 
 The school data comes from The School District of Philadelphia's [School Lists](https://www.philasd.org/performance/programsservices/open-data/school-information/#school_lists) dataset. 
 
@@ -580,7 +585,9 @@ school_block2018 <- st_join(school2018, Demo2018) %>%
 
 ```
 
-### Park
+#### Park
+
+The park data comes from OpenDataPhilly [Parks & Recreation Program Sites](https://opendataphilly.org/datasets/parks-recreation-program-sites) dataset.
 
 ```{r}
 
@@ -608,7 +615,9 @@ park_block2018 <- st_join(park,
 
 ```
 
-### Metro Station
+#### Metro Station
+
+The station data comes from STEPTA [Highspeed Stations](https://data-septa.opendata.arcgis.com/datasets/af52d74b872045d0abb4a6bbbb249453_0/explore) dataset.
 
 ```{r}
 
@@ -635,8 +644,9 @@ station_block2018 <- st_join(station,
 
 ```
 
+### Safety
 
-## Safety
+The crime data comes from Opendataphilly [Crime Incidents](https://opendataphilly.org/datasets/crime-incidents/) dataset.
 
 ```{r}
 
@@ -669,6 +679,8 @@ crime_block2018 <- st_join(crime2018, Demo2018) %>%
 ```
 
 ### Redlining
+
+The historic Redlining data comes from Philadelphia Office of the Controller (https://controller.phila.gov/philadelphia-audits/mapping-the-legacy-of-structural-racism-in-philadelphia/) .
 
 ```{r}
 
@@ -756,8 +768,6 @@ data2018 <- data2018%>%
 
 ```
 
-
-
 ```{r preview the data}
 
 data2018_summary<- data2018%>%
@@ -784,7 +794,6 @@ data2018 <-data2018%>%
 
 ```
 
-
 ### Data splitting
 
 ```{r}
@@ -800,12 +809,11 @@ Gentrification.test <- data2018[-inTrain,]
 
 ### Analyzing associations
 
-An overview of the association between gentrification and multiple
-independent variables
+An overview of the association between gentrification and multiple independent variables.
 
 ```{r Correlation, fig.height=7, fig.width=10}
 
-model <- glm(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+model <- glm(Gentrification ~ MedNumRooms+pctBlack+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+MedHhIncome+
                 school+park+station.factor+Burglary+holc_grade, 
              data = as.data.frame(Gentrification.training) %>% 
                      dplyr::select(-GEOID, -geometry),
@@ -821,11 +829,6 @@ stargazer(model,
 
 ### Correlation matrix
 
-We want a better sensitivity. A good sensitivity means that our model could correctly identify  True Positive, the gentrification block groups. Effective sensitivity empowers governments to implement targeted interventions in these areas, mitigating or reducing future gentrification.
-
-We employ a threshold of 0.45 to optimize the balance between cost and benefit. This threshold selection aims to gain a balance where the costs associated with false positives and false negatives are minimized while maximizing the benefits of correctly identifying gentrification cases.[Appendix]
-
-
 ```{r}
 
 testProbs <- data.frame(Outcome = as.factor(Gentrification.test$Gentrification),
@@ -837,7 +840,7 @@ testProbs <- data.frame(Outcome = as.factor(Gentrification.test$Gentrification),
 
 testProbs <- 
   testProbs %>%
-  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.45 , 1, 0)))
+  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.5 , 1, 0)))
 
 ```
 
@@ -864,7 +867,7 @@ ctrl <- trainControl(
   summaryFunction = twoClassSummary
 )
 
-cvFit <- train(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+cvFit <- train(Gentrification ~ MedNumRooms+pctBlack+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+MedHhIncome+
                 school+park+station.factor+Burglary+holc_grade,
   data = data2018 %>%
     dplyr::select(-GEOID, -geometry),
@@ -882,7 +885,7 @@ cvFit
 ```{r}
 
 testProbs <- data.frame(Outcome = as.factor(Gentrification.test$Gentrification),
-                        Probs = predict(model6, Gentrification.test, type= "response"))
+                        Probs = predict(model, Gentrification.test, type= "response"))
 
 ```
 
@@ -899,23 +902,6 @@ ggplot(testProbs, aes(x = Probs, fill = as.factor(Outcome))) +
 
 ```
 
-### Confusion Matrix
-
-```{r}
-
-testProbs <- 
-  testProbs %>%
-  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.5 , 1, 0)))
-
-```
-
-```{r}
-
-caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
-                       positive = "1")
-
-```
-
 ### ROC Curve
 
 ```{r}
@@ -928,8 +914,7 @@ ggplot(testProbs, aes(d = as.numeric(Outcome), m = Probs)) +
 
 ```
 
-
-### Need to adjust threshold
+### Optimize Threshold
 
 ```{r}
 
@@ -938,16 +923,18 @@ options(yardstick.event_first = FALSE)
 testProbs <- 
   testProbs %>% 
   mutate(predClass_50 = as.factor(ifelse(testProbs$Probs > 0.5 , 1, 0)),
-         predClass_45 = as.factor(ifelse(testProbs$Probs > 0.45 , 1, 0)),
+         predClass_30 = as.factor(ifelse(testProbs$Probs > 0.3 , 1, 0)),
          predClass_20 = as.factor(ifelse(testProbs$Probs > 0.2 , 1, 0)),
-         predClass_15 = as.factor(ifelse(testProbs$Probs > 0.15 , 1, 0))) 
+         predClass_15 = as.factor(ifelse(testProbs$Probs > 0.15 , 1, 0)),
+         predClass_10 = as.factor(ifelse(testProbs$Probs > 0.1 , 1, 0)),
+         predClass_05 = as.factor(ifelse(testProbs$Probs > 0.05 , 1, 0))) 
 
 testProbs %>%
   dplyr::select(-Probs) %>%
   gather(Variable, Value, -Outcome) %>%
   group_by(Variable) %>%
-  summarize(Sensitivity = round(yardstick::sens_vec(Outcome,factor(Value)),2),
-            Specificity = round(yardstick::spec_vec(Outcome,factor(Value)),2),
+  summarize(Specificity = round(yardstick::sens_vec(Outcome,factor(Value)),2),
+            Sensitivity = round(yardstick::spec_vec(Outcome,factor(Value)),2),
             Accuracy = round(yardstick::accuracy_vec(Outcome,factor(Value)),2)) %>% 
   kable() %>%
   kable_styling(full_width = F)
@@ -955,7 +942,27 @@ testProbs %>%
 ```
 
 
+#### Confusion Matrix
+
+We employ a threshold of 0.05 to optimize the sensitivity. We want a better sensitivity. A good sensitivity means that our model could correctly identify  True Positive, the gentrification block groups. Effective sensitivity empowers governments to implement targeted interventions in these areas, mitigating or reducing future gentrification.
+
 ```{r}
+
+testProbs <- 
+  testProbs %>%
+  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.05 , 1, 0)))
+
+```
+
+```{r}
+
+caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
+                       positive = "1")
+
+```
+
+
+```{r, include=FALSE}
 
 ## When gentrification occurs, housing prices increase by $500 per unit. 
 ## Investing in affordable housing to mitigate gentrification costs $800 per unit. 
@@ -985,7 +992,7 @@ kable(cost_benefit_table,
 
 ```
 
-```{r}
+```{r, include=FALSE}
 
 iterateThresholds <- function(data) {
   x = .01
@@ -1016,7 +1023,7 @@ return(all_prediction)
 
 ```
 
-```{r}
+```{r, include=FALSE}
 
 whichThreshold <- iterateThresholds(testProbs2)
 
@@ -1131,47 +1138,47 @@ numericVars %>%
 
 ```{r}
 
-model1 <- glm(Gentrification ~ MedHHIncome+MedNumRooms+pctWhite+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation,
+model1 <- glm(Gentrification ~ MedNumRooms+pctWhite+pctBlack+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+MedHhIncome,
              data = as.data.frame(Gentrification.training) %>% 
                      dplyr::select(-GEOID, -geometry),
                   family="binomial" (link="logit"))
 
-model2 <- glm(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation, 
+model2 <- glm(Gentrification ~ MedNumRooms+pctBlack+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+MedHhIncome, 
              data = as.data.frame(Gentrification.training) %>% 
                      dplyr::select(-GEOID, -geometry),
                   family="binomial" (link="logit"))
 
-model3 <- glm(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+model3 <- glm(Gentrification ~ MedNumRooms+pctBlack+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+MedHhIncome+
                 school+park, 
              data = as.data.frame(Gentrification.training) %>% 
                      dplyr::select(-GEOID, -geometry),
                   family="binomial" (link="logit"))
 
-model4 <- glm(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+model4 <- glm(Gentrification ~ MedNumRooms+pctBlack+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+MedHhIncome+
                 school+park+station, 
              data = as.data.frame(Gentrification.training) %>% 
                      dplyr::select(-GEOID, -geometry),
                   family="binomial" (link="logit"))
 
-model5 <- glm(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+model5 <- glm(Gentrification ~ MedNumRooms+pctBlack+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+MedHhIncome+
                 school+park+station+Burglary+holc_grade, 
              data = as.data.frame(Gentrification.training) %>% 
                      dplyr::select(-GEOID, -geometry),
                   family="binomial" (link="logit"))
 
-model6 <- glm(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+model6 <- glm(Gentrification ~ MedNumRooms+pctBlack+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+MedHhIncome+
                 school+park+station.factor+Burglary+holc_grade, 
              data = as.data.frame(Gentrification.training) %>% 
                      dplyr::select(-GEOID, -geometry),
                   family="binomial" (link="logit"))
 
-model7 <- glm(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+model7 <- glm(Gentrification ~ MedNumRooms+pctBlack+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+MedHhIncome+
                 school.factor+park+station.factor+Burglary+holc_grade, 
              data = as.data.frame(Gentrification.training) %>% 
                      dplyr::select(-GEOID, -geometry),
                   family="binomial" (link="logit"))
 
-model8 <- glm(Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+model8 <- glm(Gentrification ~ MedNumRooms+pctBlack+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+MedHhIncome+
                 school.factor+park.factor+station.factor+Burglary+holc_grade, 
              data = as.data.frame(Gentrification.training) %>% 
                      dplyr::select(-GEOID, -geometry),
@@ -1209,7 +1216,7 @@ ctrl <- trainControl(
 
 #model5
 cvFit <- train(
-  Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+  Gentrification ~ MedNumRooms+pctBlack+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+MedHhIncome+
                 school+park+station+Burglary+holc_grade,
   data = data2018 %>%
     dplyr::select(-GEOID, -geometry),
@@ -1227,7 +1234,7 @@ cvFit
 
 #model6
 cvFit <- train(
-  Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+  Gentrification ~ MedNumRooms+pctBlack+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+MedHhIncome+
                 school+park+station.factor+Burglary+holc_grade,
   data = data2018 %>%
     dplyr::select(-GEOID, -geometry),
@@ -1245,7 +1252,7 @@ cvFit
 
 #model7
 cvFit <- train(
-  Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+  Gentrification ~ MedNumRooms+pctBlack+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+MedHhIncome+
                 school.factor+park+station.factor+Burglary+holc_grade,
   data = data2018 %>%
     dplyr::select(-GEOID, -geometry),
@@ -1263,7 +1270,7 @@ cvFit
 
 #model8
 cvFit <- train(
-  Gentrification ~ MedHHIncome+pctBlack+pctChild+pctYouth+pctFamilyHH+pctOccupied+pctRent+pctHSEducation+
+  Gentrification ~ MedNumRooms+pctBlack+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+MedHhIncome++
                 school.factor+park.factor+station.factor+Burglary+holc_grade,
   data = data2018 %>%
     dplyr::select(-GEOID, -geometry),
