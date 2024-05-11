@@ -49,7 +49,6 @@ library(ggplot2)
 library(RColorBrewer)
 library(corrr)
 library(classInt)
-library(tmap)
 library(stargazer)
 library(RSocrata)
 library(kableExtra)
@@ -879,6 +878,44 @@ cvFit
 
 ```
 
+### Make Predictions
+```{r}
+
+testProbs <- data.frame(Outcome = as.factor(Gentrification.test$Gentrification),
+                        Probs = predict(model6, Gentrification.test, type= "response"))
+
+```
+
+```{r}
+
+ggplot(testProbs, aes(x = Probs, fill = as.factor(Outcome))) + 
+  geom_density() +
+  facet_grid(Outcome ~ .) +
+  scale_fill_manual(values = c("pink","purple")) +
+  labs(x = "Click", y = "Density of probabilities",
+       title = "Distribution of predicted probabilities by observed outcome") +
+  theme(strip.text.x = element_text(size = 18),
+        legend.position = "none")
+
+```
+
+### Confusion Matrix
+
+```{r}
+
+testProbs <- 
+  testProbs %>%
+  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.5 , 1, 0)))
+
+```
+
+```{r}
+
+caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
+                       positive = "1")
+
+```
+
 ### ROC Curve
 
 ```{r}
@@ -892,8 +929,176 @@ ggplot(testProbs, aes(d = as.numeric(Outcome), m = Probs)) +
 ```
 
 
+### Need to adjust threshold
+
+```{r}
+
+options(yardstick.event_first = FALSE)
+
+testProbs <- 
+  testProbs %>% 
+  mutate(predClass_50 = as.factor(ifelse(testProbs$Probs > 0.5 , 1, 0)),
+         predClass_45 = as.factor(ifelse(testProbs$Probs > 0.45 , 1, 0)),
+         predClass_20 = as.factor(ifelse(testProbs$Probs > 0.2 , 1, 0)),
+         predClass_15 = as.factor(ifelse(testProbs$Probs > 0.15 , 1, 0))) 
+
+testProbs %>%
+  dplyr::select(-Probs) %>%
+  gather(Variable, Value, -Outcome) %>%
+  group_by(Variable) %>%
+  summarize(Sensitivity = round(yardstick::sens_vec(Outcome,factor(Value)),2),
+            Specificity = round(yardstick::spec_vec(Outcome,factor(Value)),2),
+            Accuracy = round(yardstick::accuracy_vec(Outcome,factor(Value)),2)) %>% 
+  kable() %>%
+  kable_styling(full_width = F)
+
+```
+
+
+```{r}
+
+## When gentrification occurs, housing prices increase by $500 per unit. 
+## Investing in affordable housing to mitigate gentrification costs $800 per unit. 
+
+
+cost_benefit_table <-
+   testProbs %>%
+      count(predOutcome, Outcome) %>%
+      summarize(True_Negative = sum(n[predOutcome==0 & Outcome==0]),
+                True_Positive = sum(n[predOutcome==1 & Outcome==1]),
+                False_Negative = sum(n[predOutcome==0 & Outcome==1]),
+                False_Positive = sum(n[predOutcome==1 & Outcome==0])) %>%
+       gather(Variable, Count) %>%
+       mutate(Revenue =
+               ifelse(Variable == "True_Negative", Count * 0,
+               ifelse(Variable == "True_Positive",((0.8 - 0.5) * Count),
+               ifelse(Variable == "False_Negative", (-0.5) * Count,
+               ifelse(Variable == "False_Positive", (-.8) * Count, 0))))) %>%
+    bind_cols(data.frame(Description = c(
+              "We correctly predicted no Gentrification",
+              "We correctly predicted Gentrification",
+              "We predicted no Gentrification and the block group Gentrified",
+              "We predicted Gentrification and the block group did not Gentrify")))
+
+kable(cost_benefit_table,
+       caption = "Cost/Benefit Table") %>% kable_styling()
+
+```
+
+```{r}
+
+iterateThresholds <- function(data) {
+  x = .01
+  all_prediction <- data.frame()
+  while (x <= 1) {
+  
+  this_prediction <-
+      testProbs %>%
+      mutate(predOutcome = ifelse(Probs > x, 1, 0)) %>%
+      count(predOutcome, Outcome) %>%
+      summarize(True_Negative = sum(n[predOutcome==0 & Outcome==0]),
+                True_Positive = sum(n[predOutcome==1 & Outcome==1]),
+                False_Negative = sum(n[predOutcome==0 & Outcome==1]),
+                False_Positive = sum(n[predOutcome==1 & Outcome==0])) %>%
+     gather(Variable, Count) %>%
+     mutate(Revenue =
+               ifelse(Variable == "True_Negative", Count * 0,
+               ifelse(Variable == "True_Positive",((.8 - .5) * Count),
+               ifelse(Variable == "False_Negative", (-0.5) * Count,
+               ifelse(Variable == "False_Positive", (-0.8) * Count, 0)))),
+            Threshold = x)
+  
+  all_prediction <- rbind(all_prediction, this_prediction)
+  x <- x + .01
+  }
+return(all_prediction)
+}
+
+```
+
+```{r}
+
+whichThreshold <- iterateThresholds(testProbs2)
+
+whichThreshold_revenue <- 
+whichThreshold %>% 
+    group_by(Threshold) %>% 
+    summarize(Revenue = sum(Revenue))
+
+  ggplot(whichThreshold_revenue)+
+  geom_line(aes(x = Threshold, y = Revenue))+
+  geom_vline(xintercept =  pull(arrange(whichThreshold_revenue, -Revenue)[1,1]))+
+    labs(title = "Model Revenues By Threshold For Test Sample",
+         subtitle = "Vertical Line Denotes Optimal Threshold")
+
+```
+
+
+
+
+```
+
+
 ### Result of model testing
 
+### Validation
+
+Validate using the 2017 Data
+and compared with the 2018 model results
+
+```{r Validation}
+
+data2017 <-data2017%>%
+  left_join(.,
+            census2018_Gentrification%>%
+              st_drop_geometry()%>%
+              select(GEOID,Gentrification), 
+            by ="GEOID")%>%
+  na.omit(Gentrification)
+
+data2017$Gentrification <- as.factor(data2017$Gentrification)
+
+levels(data2017$Gentrification) <- make.names(levels(data2017$Gentrification))
+
+validationProbs <- data.frame(
+  Outcome = as.factor(data2017$Gentrification),
+  Probs = predict(model6, data2017, type = "response")
+)
+
+validationProbs <- 
+  validationProbs %>%
+  mutate(predOutcome  = as.factor(ifelse(validationProbs$Probs > 0.45 , 1, 0)))
+
+validationProbs <- validationProbs %>%
+  mutate(Outcome = as.numeric(gsub("X", "", Outcome)))
+validationProbs$predOutcome <- as.numeric(as.character(validationProbs$predOutcome))
+```
+
+
+```{r Confusion 2}
+
+caret::confusionMatrix(validationProbs$predOutcome, validationProbs$Outcome, 
+                       positive = "1")
+
+```
+
+### ROC Curve
+
+```{r}
+
+ggplot(validationProbs, aes(d = as.numeric(Outcome), m = Probs)) +
+  geom_roc(n.cuts = 50, labels = TRUE, colour = "#FF82AB") +
+  style_roc(theme = theme_grey) +
+  geom_abline(slope = 1, intercept = 0, size = 1.5, color = 'grey') +
+  labs(title = "ROC Curve")+theme_minimal()
+
+```
+
+
+
+
+
+```
 
 ### Summary
 
@@ -1073,193 +1278,6 @@ cvFit
 ```
 
 choose model6 as our best model
-
-### Make Predictions
-```{r}
-
-testProbs <- data.frame(Outcome = as.factor(Gentrification.test$Gentrification),
-                        Probs = predict(model6, Gentrification.test, type= "response"))
-
-```
-
-```{r}
-
-ggplot(testProbs, aes(x = Probs, fill = as.factor(Outcome))) + 
-  geom_density() +
-  facet_grid(Outcome ~ .) +
-  scale_fill_manual(values = c("pink","purple")) +
-  labs(x = "Click", y = "Density of probabilities",
-       title = "Distribution of predicted probabilities by observed outcome") +
-  theme(strip.text.x = element_text(size = 18),
-        legend.position = "none")
-
-```
-
-### Confusion Matrix
-
-```{r}
-
-testProbs <- 
-  testProbs %>%
-  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.5 , 1, 0)))
-
-```
-
-```{r}
-
-caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
-                       positive = "1")
-
-```
-
-### ROC Curve
-
-```{r}
-
-ggplot(testProbs, aes(d = as.numeric(Outcome), m = Probs)) +
-  geom_roc(n.cuts = 50, labels = TRUE, colour = "#FF82AB") +
-  style_roc(theme = theme_grey) +
-  geom_abline(slope = 1, intercept = 0, size = 1.5, color = 'grey') +
-  labs(title = "ROC Curve")+theme_minimal()
-
-```
-
-
-### Need to adjust threshold
-
-```{r}
-
-options(yardstick.event_first = FALSE)
-
-testProbs <- 
-  testProbs %>% 
-  mutate(predClass_50 = as.factor(ifelse(testProbs$Probs > 0.5 , 1, 0)),
-         predClass_45 = as.factor(ifelse(testProbs$Probs > 0.45 , 1, 0)),
-         predClass_20 = as.factor(ifelse(testProbs$Probs > 0.2 , 1, 0)),
-         predClass_15 = as.factor(ifelse(testProbs$Probs > 0.15 , 1, 0))) 
-
-testProbs %>%
-  dplyr::select(-Probs) %>%
-  gather(Variable, Value, -Outcome) %>%
-  group_by(Variable) %>%
-  summarize(Sensitivity = round(yardstick::sens_vec(Outcome,factor(Value)),2),
-            Specificity = round(yardstick::spec_vec(Outcome,factor(Value)),2),
-            Accuracy = round(yardstick::accuracy_vec(Outcome,factor(Value)),2)) %>% 
-  kable() %>%
-  kable_styling(full_width = F)
-
-```
-
-
-```{r}
-
-## When gentrification occurs, housing prices increase by $500 per unit. 
-## Investing in affordable housing to mitigate gentrification costs $800 per unit. 
-
-
-cost_benefit_table <-
-   testProbs %>%
-      count(predOutcome, Outcome) %>%
-      summarize(True_Negative = sum(n[predOutcome==0 & Outcome==0]),
-                True_Positive = sum(n[predOutcome==1 & Outcome==1]),
-                False_Negative = sum(n[predOutcome==0 & Outcome==1]),
-                False_Positive = sum(n[predOutcome==1 & Outcome==0])) %>%
-       gather(Variable, Count) %>%
-       mutate(Revenue =
-               ifelse(Variable == "True_Negative", Count * 0,
-               ifelse(Variable == "True_Positive",((0.8 - 0.5) * Count),
-               ifelse(Variable == "False_Negative", (-0.5) * Count,
-               ifelse(Variable == "False_Positive", (-.8) * Count, 0))))) %>%
-    bind_cols(data.frame(Description = c(
-              "We correctly predicted no Gentrification",
-              "We correctly predicted Gentrification",
-              "We predicted no Gentrification and the block group Gentrified",
-              "We predicted Gentrification and the block group did not Gentrify")))
-
-kable(cost_benefit_table,
-       caption = "Cost/Benefit Table") %>% kable_styling()
-
-```
-
-```{r}
-
-iterateThresholds <- function(data) {
-  x = .01
-  all_prediction <- data.frame()
-  while (x <= 1) {
-  
-  this_prediction <-
-      testProbs %>%
-      mutate(predOutcome = ifelse(Probs > x, 1, 0)) %>%
-      count(predOutcome, Outcome) %>%
-      summarize(True_Negative = sum(n[predOutcome==0 & Outcome==0]),
-                True_Positive = sum(n[predOutcome==1 & Outcome==1]),
-                False_Negative = sum(n[predOutcome==0 & Outcome==1]),
-                False_Positive = sum(n[predOutcome==1 & Outcome==0])) %>%
-     gather(Variable, Count) %>%
-     mutate(Revenue =
-               ifelse(Variable == "True_Negative", Count * 0,
-               ifelse(Variable == "True_Positive",((.8 - .5) * Count),
-               ifelse(Variable == "False_Negative", (-0.5) * Count,
-               ifelse(Variable == "False_Positive", (-0.8) * Count, 0)))),
-            Threshold = x)
-  
-  all_prediction <- rbind(all_prediction, this_prediction)
-  x <- x + .01
-  }
-return(all_prediction)
-}
-
-```
-
-```{r}
-
-whichThreshold <- iterateThresholds(testProbs2)
-
-whichThreshold_revenue <- 
-whichThreshold %>% 
-    group_by(Threshold) %>% 
-    summarize(Revenue = sum(Revenue))
-
-  ggplot(whichThreshold_revenue)+
-  geom_line(aes(x = Threshold, y = Revenue))+
-  geom_vline(xintercept =  pull(arrange(whichThreshold_revenue, -Revenue)[1,1]))+
-    labs(title = "Model Revenues By Threshold For Test Sample",
-         subtitle = "Vertical Line Denotes Optimal Threshold")
-
-```
-### Validation
-
-Validate using the 2017 Data
-and compared with the 2018 model results
-
-```{r Validation}
-data2017 <-data2017%>%
-  left_join(.,
-            census2018_Gentrification%>%
-              st_drop_geometry()%>%
-              select(GEOID,Gentrification), 
-            by ="GEOID")%>%
-  na.omit(Gentrification)
-
-data2017$Gentrification <- as.factor(data2017$Gentrification)
-
-levels(data2017$Gentrification) <- make.names(levels(data2017$Gentrification))
-
-```
-
-```{r Prediction by 2017}
-
-# Predict probabilities
-predictions <- predict(model6, data2017, type = "response")
-
-roc_curve <- roc(data2017$Gentrification, predictions)
-auc(roc_curve)
-
-# Plot ROC curve
-plot(roc_curve, main = "ROC Curve")
-
-```
 
 
 #### References
