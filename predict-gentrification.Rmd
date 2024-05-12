@@ -809,7 +809,8 @@ Gentrification.test <- data2018[-inTrain,]
 
 ### Analyzing associations
 
-An overview of the association between gentrification and multiple independent variables.
+
+using our finalized model 6, specific model selection could refer to appendix.
 
 ```{r Correlation, fig.height=7, fig.width=10}
 
@@ -819,12 +820,27 @@ model <- glm(Gentrification ~ MedNumRooms+pctBlack+pctYouth+pctnonFamilyHH+prcMo
                      dplyr::select(-GEOID, -geometry),
                   family="binomial" (link="logit"))
 
-stargazer(model,
-          title = "Model",
-          type = "text",
-          digits = 2,
-          no.space = TRUE)
+```
 
+An overview of the association between gentrification and multiple independent variables. explore the positive or negative relation, and the relation statistical significanse.
+
+```{r}
+Gentrification_sum <- summary(model)
+
+coefficients_table <- as.data.frame(Gentrification_sum$coefficients)
+
+coefficients_table$significance <- ifelse(coefficients_table$`Pr(>|z|)` < 0.001, '***',
+                                         ifelse(coefficients_table$`Pr(>|z|)` < 0.01, '**',
+                                                ifelse(coefficients_table$`Pr(>|z|)` < 0.05, '*',
+                                                       ifelse(coefficients_table$`Pr(>|z|)` < 0.1, '.', ''))))
+
+coefficients_table$p_value <- paste0(round(coefficients_table$`Pr(>|z|)`, digits = 3), coefficients_table$significance)
+
+coefficients_table %>%
+  select(-significance, -`Pr(>|z|)`) %>% 
+  kable(align = "r") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))  %>%
+  footnote(general_title = "\n", general = "Table 1")
 ```
 
 ### Correlation matrix
@@ -950,7 +966,7 @@ We employ a threshold of 0.05 to optimize the sensitivity. We want a better sens
 
 testProbs <- 
   testProbs %>%
-  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.05 , 1, 0)))
+  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.1 , 1, 0)))
 
 ```
 
@@ -1043,9 +1059,6 @@ whichThreshold %>%
 
 
 
-```
-
-
 ### Result of model testing
 
 ### Validation
@@ -1053,7 +1066,7 @@ whichThreshold %>%
 Validate using the 2017 Data
 and compared with the 2018 model results
 
-```{r Validation}
+```{r 2017 data}
 
 data2017 <-data2017%>%
   left_join(.,
@@ -1074,38 +1087,43 @@ validationProbs <- data.frame(
 
 validationProbs <- 
   validationProbs %>%
-  mutate(predOutcome  = as.factor(ifelse(validationProbs$Probs > 0.45 , 1, 0)))
+  mutate(predOutcome  = as.factor(ifelse(validationProbs$Probs > 0.1 , 1, 0)))
 
 validationProbs <- validationProbs %>%
   mutate(Outcome = as.numeric(gsub("X", "", Outcome)))
 validationProbs$predOutcome <- as.numeric(as.character(validationProbs$predOutcome))
+
+# Convert to factors ensuring both have the same levels
+levels <- union(levels(factor(validationProbs$Outcome)), levels(factor(validationProbs$predOutcome)))
+
+validationProbs$Outcome <- factor(validationProbs$Outcome, levels = levels)
+validationProbs$predOutcome <- factor(validationProbs$predOutcome, levels = levels)
+
 ```
 
 
-```{r Confusion 2}
+```{r 2017 Confusion Matrix}
 
-caret::confusionMatrix(validationProbs$predOutcome, validationProbs$Outcome, 
-                       positive = "1")
+# Now, run the confusion matrix
+confusionMatrix <- caret::confusionMatrix(validationProbs$predOutcome, validationProbs$Outcome, positive = "1")
+print(confusionMatrix)
 
 ```
 
 ### ROC Curve
 
 ```{r}
-
 ggplot(validationProbs, aes(d = as.numeric(Outcome), m = Probs)) +
-  geom_roc(n.cuts = 50, labels = TRUE, colour = "#FF82AB") +
+  geom_roc(n.cuts = 50, labels = FALSE, colour = "#FF82AB") +
   style_roc(theme = theme_grey) +
   geom_abline(slope = 1, intercept = 0, size = 1.5, color = 'grey') +
-  labs(title = "ROC Curve")+theme_minimal()
-
-```
-
-
-
+  labs(title = "ROC Curve") +
+  theme_minimal()
 
 
 ```
+
+
 
 ### Summary
 
