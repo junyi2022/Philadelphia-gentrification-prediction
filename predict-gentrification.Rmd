@@ -822,7 +822,7 @@ model <- glm(Gentrification ~ MedNumRooms+pctBlack+pctYouth+pctnonFamilyHH+prcMo
 
 ```
 
-An overview of the association between gentrification and multiple independent variables. explore the positive or negative relation, and the relation statistical significanse.
+An overview of the association between gentrification and multiple independent variables, exploring the positive or negative correlations and their statistical significance.
 
 ```{r}
 Gentrification_sum <- summary(model)
@@ -842,25 +842,63 @@ coefficients_table %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"))  %>%
   footnote(general_title = "\n", general = "Table 1")
 ```
+```{r fit_metrics, warning = FALSE, message = FALSE, results='hide'}
+
+pR2(model)
+
+#Kable to show the result
+
+fit_metrics <- pR2(model)
+fit_metrics_df <- as.data.frame(t(fit_metrics))
+
+kable(fit_metrics_df, caption = "Fit Metrics for Logistic Regression Model", align = 'r', digits = 4) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+  footnote(general_title = "\n", general = "Table 2") 
+```
+
+
+### Optimize Threshold
+
+```{r}
+
+options(yardstick.event_first = FALSE)
+
+testProbs <- 
+  testProbs %>% 
+  mutate(predClass_50 = as.factor(ifelse(testProbs$Probs > 0.5 , 1, 0)),
+         predClass_30 = as.factor(ifelse(testProbs$Probs > 0.3 , 1, 0)),
+         predClass_20 = as.factor(ifelse(testProbs$Probs > 0.2 , 1, 0)),
+         predClass_15 = as.factor(ifelse(testProbs$Probs > 0.15 , 1, 0)),
+         predClass_10 = as.factor(ifelse(testProbs$Probs > 0.1 , 1, 0)),
+         predClass_05 = as.factor(ifelse(testProbs$Probs > 0.05 , 1, 0))) 
+
+testProbs %>%
+  dplyr::select(-Probs) %>%
+  gather(Variable, Value, -Outcome) %>%
+  group_by(Variable) %>%
+  summarize(Specificity = round(yardstick::sens_vec(Outcome,factor(Value)),2),
+            Sensitivity = round(yardstick::spec_vec(Outcome,factor(Value)),2),
+            Accuracy = round(yardstick::accuracy_vec(Outcome,factor(Value)),2)) %>% 
+  kable() %>%
+  kable_styling(full_width = F)
+
+```
+
 
 ### Correlation matrix
+
+use the optimized thershold 0.1
 
 ```{r}
 
 testProbs <- data.frame(Outcome = as.factor(Gentrification.test$Gentrification),
                         Probs = predict(model, Gentrification.test, type= "response"))
 
-```
-
-```{r}
 
 testProbs <- 
   testProbs %>%
-  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.5 , 1, 0)))
+  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.1 , 1, 0)))
 
-```
-
-```{r}
 
 caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
                        positive = "1")
@@ -903,9 +941,6 @@ cvFit
 testProbs <- data.frame(Outcome = as.factor(Gentrification.test$Gentrification),
                         Probs = predict(model, Gentrification.test, type= "response"))
 
-```
-
-```{r}
 
 ggplot(testProbs, aes(x = Probs, fill = as.factor(Outcome))) + 
   geom_density() +
@@ -923,39 +958,15 @@ ggplot(testProbs, aes(x = Probs, fill = as.factor(Outcome))) +
 ```{r}
 
 ggplot(testProbs, aes(d = as.numeric(Outcome), m = Probs)) +
-  geom_roc(n.cuts = 50, labels = TRUE, colour = "#FF82AB") +
+  geom_roc(n.cuts = 50, labels = FALSE, colour = "#FF82AB") +
   style_roc(theme = theme_grey) +
   geom_abline(slope = 1, intercept = 0, size = 1.5, color = 'grey') +
-  labs(title = "ROC Curve")+theme_minimal()
+  labs(title = "ROC Curve") +
+  theme_minimal()
+
 
 ```
 
-### Optimize Threshold
-
-```{r}
-
-options(yardstick.event_first = FALSE)
-
-testProbs <- 
-  testProbs %>% 
-  mutate(predClass_50 = as.factor(ifelse(testProbs$Probs > 0.5 , 1, 0)),
-         predClass_30 = as.factor(ifelse(testProbs$Probs > 0.3 , 1, 0)),
-         predClass_20 = as.factor(ifelse(testProbs$Probs > 0.2 , 1, 0)),
-         predClass_15 = as.factor(ifelse(testProbs$Probs > 0.15 , 1, 0)),
-         predClass_10 = as.factor(ifelse(testProbs$Probs > 0.1 , 1, 0)),
-         predClass_05 = as.factor(ifelse(testProbs$Probs > 0.05 , 1, 0))) 
-
-testProbs %>%
-  dplyr::select(-Probs) %>%
-  gather(Variable, Value, -Outcome) %>%
-  group_by(Variable) %>%
-  summarize(Specificity = round(yardstick::sens_vec(Outcome,factor(Value)),2),
-            Sensitivity = round(yardstick::spec_vec(Outcome,factor(Value)),2),
-            Accuracy = round(yardstick::accuracy_vec(Outcome,factor(Value)),2)) %>% 
-  kable() %>%
-  kable_styling(full_width = F)
-
-```
 
 
 #### Confusion Matrix
@@ -967,10 +978,6 @@ We employ a threshold of 0.05 to optimize the sensitivity. We want a better sens
 testProbs <- 
   testProbs %>%
   mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.1 , 1, 0)))
-
-```
-
-```{r}
 
 caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
                        positive = "1")
@@ -1101,6 +1108,20 @@ validationProbs$predOutcome <- factor(validationProbs$predOutcome, levels = leve
 
 ```
 
+
+```{r 2017 cv}
+cvFit <- train(Gentrification ~ MedNumRooms+pctBlack+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+MedHhIncome+
+                school+park+station.factor+Burglary+holc_grade,
+  data = data2017 %>%
+    dplyr::select(-GEOID, -geometry),
+  method = "glm",
+  family = "binomial",
+  metric = "ROC",
+  trControl = ctrl
+)
+
+cvFit
+```
 
 ```{r 2017 Confusion Matrix}
 
