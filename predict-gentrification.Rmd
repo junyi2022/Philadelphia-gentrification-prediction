@@ -60,12 +60,14 @@ library(pROC)
 library(lubridate)
 library(stargazer)
 
-
-# inflation rate for 2017 is *2.13%*, for 2018 is *2.44%*, for 2019 is *1.81%*, for 2020 is *1.23%*.  
+# Inflation adjust
 inflationAdjust2017 <- 1.0213
 inflationAdjust2018 <- 1.0244
-# inflationAdjust2019 <- 1.0181
-# inflationAdjust2020 <- 1.0123
+
+# Color palette
+palette2 <- c('#6683a9', '#BF4146')
+palette5 <- c('#BF4146', '#E5A186', '#F1C8BB', '#B3CADB','#6683a9')
+c('#A62C2C', '#BF4146', '#faf2e6', '#80a1c2', '#6683a9')
 
 ```
 
@@ -73,14 +75,14 @@ inflationAdjust2018 <- 1.0244
 
 This project aims to use machine learning methods to forecast patterns of gentrification in the unit of census block groups within Philadelphia. Gentrification, a complex socioeconomic phenomenon, has significant implications for urban development, housing affordability, and community dynamics. From the research of the [Urban Displacement Project](https://www.urbandisplacement.org/about/what-are-gentrification-and-displacement/), gentrification is usually associated with real estate speculation, increased investment in neighborhood amenities such as transit and parks, change in land use, and changes in the character of the neighborhood such as business type change." These new investments often lead to displacement of existing low-income residents through rent increase, eviction, and other displacement pressure. Therefore, this project seeks to empower policymakers, urban planners, and community advocates to make informed decisions and implement equitable strategies for sustainable growth and inclusive development.   
 
-This project will use the 2017 and 2018 data to train the machine learning model and use the 2018 and 2019 data to do the validation. There are two reasons for this decision. Firstly, the COVID pandemic in 2020 largely impacted the normal pattern of people's daily life, so we don't want our model to span across the year 2020. Secondly, the area of each census block group gets updated [every decade](https://learn.arcgis.com/en/related-concepts/united-states-census-geography.htm#:~:text=Census%20blocks%20are%20often%20the,)%20or%20centroids%20(points).), so we are not able to get the same census block group before and after 2020. The reason why we don't focus on the years after 2020 is because currently there are only 2 years of census data, which is not enough for training the model and testing on a different year.    
+This project will use the 2018 and 2019 data to train the machine learning model and use the 2017 and 2018 data to do the validation. There are two reasons for this decision. Firstly, the COVID pandemic in 2020 largely impacted the normal pattern of people's daily life, so we don't want our model to span across the year 2020. Secondly, the area of each census block group gets updated [every decade](https://learn.arcgis.com/en/related-concepts/united-states-census-geography.htm#:~:text=Census%20blocks%20are%20often%20the,&#41;%20or%20centroids%20&#40;points&#41;.), so we are not able to get the same census block group before and after 2020.     
 
 The census data used in this project is from [American Census Survey (ACS)](https://data.census.gov/) 5-year survey, and other data used in this project comes from [OpenDataPhilly](https://opendataphilly.org/).    
 
 
 ## Calculate Gentrification (Dependent Variable)
 
-Since gentrification is a vague and variable term, we need to define gentrification in this project and calculate the area of gentrification within Philadelphia by using related geospatial datasets.  
+Since gentrification is a vague and variable term, we need to first define gentrification in this project and calculate the area of gentrification within Philadelphia by using related geospatial datasets.  
 
 Based on the [dictionary definition](https://www.merriam-webster.com/dictionary/gentrification), the term *gentrification* means "a process in which a poor area (as of a city) experiences an influx of middle-class or wealthy people who renovate and rebuild homes and businesses and which often results in an increase in property values and the displacement of earlier, usually poorer residents." In this way, there are two main characteristics of gentrification: census composition change and property value change.  
 
@@ -92,12 +94,12 @@ Since many of our criteria involves money, we need to adjust for inflation. Base
 
 __In summary, our method to calculate gentrification is:__    
 1. Percentage of minority group (non-white) decreases by more than 4% in a 1-year interval.  
-2. Median household income 1 years ago was below Philadelphia County's median.
+2. Median household income 1 years ago was below Philadelphia County's median.  
 3. More than 5% increase of property value in a 1-year interval
 
 ### Census Data
 
-The census data we need to collect for calculating gentrification is ACS 5-year data from 2017 to 2019, and the geography is census block groups in Philadelphia. The demographic data we need to collect or calculate are total population, percentage of non-white population, and median household income.    
+The census data we need to collect for calculating gentrification is ACS 5-year data from 2017 to 2019, and the geography is census block groups in Philadelphia. The demographic data we need to collect are `B01001_001E Total Population`, `B02001_002E Race`, and `B19013_001E Median Household Income in the past 12 Months`. In this way, we can calculate the percentage of non-white population.     
 
 ```{r, include = FALSE}
 
@@ -148,8 +150,56 @@ census2019 <- get_acs(geography = "block group",
 
 ```
 
+```{r, eval = FALSE}
 
-Since one of our criteria needs to compare median income to Philadelphia County's value. We need to calculate the median difference between each block group and the larger geography (Philadelphia) for the selected three years. Because some of the block groups do not have median household income value data from the census survey, we will keep the household income difference for those as NA.   
+census2017 <- get_acs(geography = "block group", 
+          survey = "acs5",
+          variables = c("B01001_001E", "B02001_002E", "B19013_001E"), 
+          year = 2017, 
+          state = "42", 
+          county = "101", 
+          geometry = T, 
+          output = "wide") %>%
+  st_transform(crs = 2272) %>%
+  rename(TotalPop = B01001_001E,
+         NumberWhites = B02001_002E,
+         MedHhIncome = B19013_001E) %>%
+  mutate(pctNonWhite = 1 - NumberWhites / TotalPop)%>%
+  select(-NAME, -B01001_001M, -B02001_002M, -B19013_001M)
+
+census2018 <- get_acs(geography = "block group", 
+          survey = "acs5",
+          variables = c("B01001_001E", "B02001_002E", "B19013_001E"), 
+          year = 2018, 
+          state = "42", 
+          county = "101", 
+          geometry = T, 
+          output = "wide") %>%
+  st_transform(crs = 2272) %>%
+  rename(TotalPop = B01001_001E,
+         NumberWhites = B02001_002E,
+         MedHhIncome = B19013_001E) %>%
+  mutate(pctNonWhite = 1 - NumberWhites / TotalPop)%>%
+  select(-NAME, -B01001_001M, -B02001_002M, -B19013_001M)
+
+census2019 <- get_acs(geography = "block group", 
+          survey = "acs5",
+          variables = c("B01001_001E", "B02001_002E", "B19013_001E"), 
+          year = 2019, 
+          state = "42", 
+          county = "101", 
+          geometry = T, 
+          output = "wide") %>%
+  st_transform(crs = 2272) %>%
+  rename(TotalPop = B01001_001E,
+         NumberWhites = B02001_002E,
+         MedHhIncome = B19013_001E) %>%
+  mutate(pctNonWhite = 1 - NumberWhites / TotalPop)%>%
+  select(-NAME, -B01001_001M, -B02001_002M, -B19013_001M)
+
+```
+
+Since one of our criteria needs to compare median income to Philadelphia County's value. We need to calculate the median difference between each block group and the larger geography (Philadelphia) for the selected three years. Because some of the block groups do not have median household income value data from the census data, we will keep the household income difference for those as NA.   
 
 ```{r}
 
@@ -192,7 +242,7 @@ PWDparcel$BRT_ID <- as.numeric(PWDparcel$BRT_ID)
 In order to match the properties with the parcels, we use certain IDs to join them, and those are `parcel_number` in the property dataset and `BRT_ID` in the PWD parcel dataset. After joining these two dataset together, we will calculate the median property value in each census block group and add that as a new column in the corresponding census dataframe. This process will repeat for 3 times since we need to manipulate 3 years' data.    
 
 
-```{r fig.width=10}
+```{r}
 
 # 2017
 
@@ -251,9 +301,9 @@ census2018 <- merge(census2018, median_property_value_2018, by.x = "GEOID", by.y
 
 ### Calculate change
 
-Because of standard for calculating gentrification involves change between two years, we need to transfer the 2017 data to the 2018 dataframe and the 2018 data to the 2019 dataframe. Firstly, we transfer the percentage of minority(non-white) group and calculate the percent change within 1 year.    
+Because the standard for calculating gentrification involves change between two years, we need to transfer the 2017 data to the 2018 dataframe and the 2018 data to the 2019 dataframe. Firstly, we transfer the percentage of minority(non-white) group and calculate the percent change within 1 year.    
 
-```{r}
+```{r fig.height=6, fig.width=12}
 
 # 2017 to 2018
 
@@ -276,11 +326,52 @@ census2018_pctNonwhite <- census2018 %>%
 census2019 <- merge(census2019, census2018_pctNonwhite, by.x = "GEOID", by.y = "GEOID", all.x = TRUE) %>%
   mutate(NW_change_pct = (pctNonWhite - pctNW_2018) / pctNW_2018)
 
+
+# Plots
+
+# Calculate quantiles for class breaks
+breaks_quantiles <- classIntervals(census2018$NW_change_pct, n = 5, na.rm=TRUE, style = "quantile")
+
+# Generate custom labels showing the range of each class
+labels <- paste0(formatC(breaks_quantiles$brks[-length(breaks_quantiles$brks)], format = "f", digits = 2, big.mark = ","), 
+                 " - ", 
+                 formatC(breaks_quantiles$brks[-1], format = "f", digits = 2, big.mark = ","))
+
+plot2018 <- ggplot() +
+  geom_sf(data = census2018, aes(fill = cut(NW_change_pct, breaks = breaks_quantiles$brks, include.lowest = TRUE)), color = "white", linewidth = 0.01) +
+  scale_fill_manual(values = palette5, na.value = "#e9e9e9",
+                     name = "Change Percentage",
+                     labels = labels) +  # Use custom range labels
+  labs(title = "Philadelphia Percent Non-white Change by Block Group in 2018") +
+  theme_void()
+
+
+# Calculate quantiles for class breaks
+breaks_quantiles <- classIntervals(census2019$NW_change_pct, n = 5, na.rm=TRUE, style = "quantile")
+
+# Generate custom labels showing the range of each class
+labels <- paste0(formatC(breaks_quantiles$brks[-length(breaks_quantiles$brks)], format = "f", digits = 2, big.mark = ","), 
+                 " - ", 
+                 formatC(breaks_quantiles$brks[-1], format = "f", digits = 2, big.mark = ","))
+
+plot2019 <- ggplot() +
+  geom_sf(data = census2019, aes(fill = cut(NW_change_pct, breaks = breaks_quantiles$brks, include.lowest = TRUE)), color = "white", linewidth = 0.01) +
+  scale_fill_manual(values = palette5, na.value = "#e9e9e9",
+                     name = "Change Percentage",
+                     labels = labels) +  # Use custom range labels
+  labs(title = "Philadelphia Percent Non-white Change by Block Group in 2019") +
+  theme_void()
+
+grid.arrange(
+  plot2018, plot2019,
+  ncol = 2 
+) 
+
 ```
 
-Secondly, we transfer the median household income difference and categorize this value. If the median household income one year ago is greater than the Philadelphia median, the census block group will get a `1`, and if the median household income one year ago is less than the Philadelphia median, the census block group will get a `0`. Besides, since we originally have some NA household income value, we will keep this new categorized value in those census block groups as NA.  
+Secondly, we transfer the median household income difference and categorize this value. If the median household income one year ago is greater than the Philadelphia median, the census block group will get a `1`, and if the median household income one year ago is less than the Philadelphia median, the census block group will get a `0`. Besides, since we originally have some NA household income value, we will keep this new categorized value in those census block groups as NA.    
 
-```{r}
+```{r fig.height=6, fig.width=12.5}
 
 # 2017 to 2018
 
@@ -292,6 +383,9 @@ census2017_medianHHI <- census2017 %>%
 
 census2018 <- merge(census2018, census2017_medianHHI, by.x = "GEOID", by.y = "GEOID", all.x = TRUE)
 
+census2018$MedHhIBool_2017Factor <- factor(census2018$MedHhIBool_2017,
+                                                   levels = c(0, 1),
+                                                   labels = c("More than PHL Median", "Less than PHL Median"))
 
 # 2018 to 2019
 
@@ -303,11 +397,37 @@ census2018_medianHHI <- census2018 %>%
 
 census2019 <- merge(census2019, census2018_medianHHI, by.x = "GEOID", by.y = "GEOID", all.x = TRUE)
 
+census2019$MedHhIBool_2018Factor <- factor(census2019$MedHhIBool_2018,
+                                                   levels = c(0, 1),
+                                                   labels = c("More than PHL Median", "Less than PHL Median"))
+
+
+# Plots
+
+plot2018 <- ggplot() +
+  geom_sf(data = census2018, aes(fill=MedHhIBool_2017Factor), colour='white', linewidth = 0.01) +
+  scale_fill_manual(values = palette2, na.value = "#e9e9e9",
+                     name = "Household Income") +
+  labs(title = "Philadelphia Household Income by Block Group in 2017") +
+  theme_void() 
+
+plot2019 <- ggplot() +
+  geom_sf(data = census2019, aes(fill=MedHhIBool_2018Factor), colour='white', linewidth = 0.01) +
+  scale_fill_manual(values = palette2, na.value = "#e9e9e9",
+                     name = "Household Income") +
+  labs(title = "Philadelphia Household Income by Block Group in 2018") +
+  theme_void()
+
+grid.arrange(
+  plot2018, plot2019,
+  ncol = 2 
+) 
+
 ```
 
 We also need to calculate the median value change within 1 year. In this way, we need to add the property value of 2017 in the 2018 dataframe and the property value of 2018 in the 2019 dataframe in order to calculate the difference. In order to calculate the percent change of the median property value, we also need to adjust for inflation.   
 
-```{r}
+```{r fig.height=6, fig.width=12}
 
 # 2017 to 2018
 
@@ -330,6 +450,47 @@ census2018_prop <- census2018 %>%
 census2019 <- merge(census2019, census2018_prop, by.x = "GEOID", by.y = "GEOID", all.x = TRUE) %>%
   mutate(PV_change_pct = (median_property_value - median_pv_2018 * inflationAdjust2018) / median_pv_2018 * inflationAdjust2018)
 
+
+# Plots
+
+# Calculate quantiles for class breaks
+breaks_quantiles <- classIntervals(census2018$PV_change_pct, n = 5, na.rm=TRUE, style = "quantile")
+
+# Generate custom labels showing the range of each class
+labels <- paste0(formatC(breaks_quantiles$brks[-length(breaks_quantiles$brks)], format = "f", digits = 2, big.mark = ","), 
+                 " - ", 
+                 formatC(breaks_quantiles$brks[-1], format = "f", digits = 2, big.mark = ","))
+
+plot2018 <- ggplot() +
+  geom_sf(data = census2018, aes(fill = cut(PV_change_pct, breaks = breaks_quantiles$brks, include.lowest = TRUE)), color = "white", linewidth = 0.01) +
+  scale_fill_manual(values = palette5, na.value = "#e9e9e9",
+                     name = "Change Percentage",
+                     labels = labels) +  # Use custom range labels
+  labs(title = "Philadelphia Property Value Change by Block Group in 2018") +
+  theme_void()
+
+
+# Calculate quantiles for class breaks
+breaks_quantiles <- classIntervals(census2019$PV_change_pct, n = 5, na.rm=TRUE, style = "quantile")
+
+# Generate custom labels showing the range of each class
+labels <- paste0(formatC(breaks_quantiles$brks[-length(breaks_quantiles$brks)], format = "f", digits = 2, big.mark = ","), 
+                 " - ", 
+                 formatC(breaks_quantiles$brks[-1], format = "f", digits = 2, big.mark = ","))
+
+plot2019 <- ggplot() +
+  geom_sf(data = census2019, aes(fill = cut(PV_change_pct, breaks = breaks_quantiles$brks, include.lowest = TRUE)), color = "white", linewidth = 0.01) +
+  scale_fill_manual(values = palette5, na.value = "#e9e9e9",
+                     name = "Change Percentage",
+                     labels = labels) +  # Use custom range labels
+  labs(title = "Philadelphia Property Value Change by Block Group in 2019") +
+  theme_void()
+
+grid.arrange(
+  plot2018, plot2019,
+  ncol = 2 
+) 
+
 ```
 
 
@@ -340,28 +501,42 @@ After all the manipulations above, we will finally calculate whether a census bl
 The two plots below show the result of gentrification in the year 2018 and 2019. We can see more census block groups are gentrifying as time goes by, and most of them located around Center City and University City.  
 
 
-```{r fig.width=10}
+```{r fig.height=6, fig.width=12}
 
 census2018_Gentrification <- census2018 %>%
   select(GEOID, NW_change_pct, MedHhIBool_2017, PV_change_pct) %>%
   mutate(Gentrification = ifelse(NW_change_pct < -0.04 & MedHhIBool_2017 == 1 & PV_change_pct > 0.05, 1, 0))
 
+census2018_Gentrification$GentrificationFactor <- factor(census2018_Gentrification$Gentrification,
+                                                   levels = c(0, 1),
+                                                   labels = c("Non-gentrified", "Gentrified"))
+
 census2019_Gentrification <- census2019 %>%
   select(GEOID, NW_change_pct, MedHhIBool_2018, PV_change_pct) %>%
   mutate(Gentrification = ifelse(NW_change_pct < -0.04 & MedHhIBool_2018 == 1 & PV_change_pct > 0.05, 1, 0))
 
+census2019_Gentrification$GentrificationFactor <- factor(census2019_Gentrification$Gentrification,
+                                                   levels = c(0, 1),
+                                                   labels = c("Non-gentrified", "Gentrified"))
+
 
 plot2018Gen <- ggplot() +
-  geom_sf(data = census2018_Gentrification, aes(fill=Gentrification), colour='grey') +
-  theme_void()
+  geom_sf(data = census2018_Gentrification, aes(fill=GentrificationFactor), colour='white', linewidth = 0.01) +
+  scale_fill_manual(values = palette2, na.value = "#e9e9e9",
+                     name = "Gentrification") +
+  labs(title = "Philadelphia Gentrification by Block Group in 2018") +
+  theme_void() 
 
 plot2019Gen <- ggplot() +
-  geom_sf(data = census2019_Gentrification, aes(fill=Gentrification), colour='grey') +
+  geom_sf(data = census2019_Gentrification, aes(fill=GentrificationFactor), colour='white', linewidth = 0.01) +
+  scale_fill_manual(values = palette2, na.value = "#e9e9e9",
+                     name = "Gentrification") +
+  labs(title = "Philadelphia Gentrification by Block Group in 2019") +
   theme_void()
 
 grid.arrange(
   plot2018Gen, plot2019Gen,
-  ncol = 2  
+  ncol = 2 
 ) 
 
 ```
@@ -520,7 +695,7 @@ Education amenities is one of the independent variable we considered.
 
 The school data comes from The School District of Philadelphia's [School Lists](https://www.philasd.org/performance/programsservices/open-data/school-information/#school_lists) dataset. 
 
-```{r}
+```{r, include=FALSE}
 #2017
 school2017<- st_read("data/independent/2017-2018 Master School List (20180611).xlsx")
 
@@ -571,7 +746,7 @@ school_block2018 <- st_join(school2018, Demo2018) %>%
 
 The park data comes from OpenDataPhilly [Parks & Recreation Program Sites](https://opendataphilly.org/datasets/parks-recreation-program-sites) dataset.
 
-```{r}
+```{r, include=FALSE}
 
 park<- st_read("data/independent/PPR_Program_Sites.geojson")%>%
   st_transform(crs = 2272)
@@ -601,7 +776,7 @@ park_block2018 <- st_join(park,
 
 The station data comes from STEPTA [Highspeed Stations](https://data-septa.opendata.arcgis.com/datasets/af52d74b872045d0abb4a6bbbb249453_0/explore) dataset.
 
-```{r}
+```{r, include=FALSE}
 
 station <- st_read("data/independent/Highspeed_Stations.geojson")%>%
   st_transform(crs=2272)
@@ -630,7 +805,7 @@ station_block2018 <- st_join(station,
 
 The crime data comes from Opendataphilly [Crime Incidents](https://opendataphilly.org/datasets/crime-incidents/) dataset.
 
-```{r}
+```{r, include=FALSE}
 
 #2017
 crime2017<- st_read("data/independent/incidents_part1_part2_2017/incidents_part1_part2.shp")%>%
@@ -662,9 +837,9 @@ crime_block2018 <- st_join(crime2018, Demo2018) %>%
 
 ### Redlining
 
-The historic Redlining data comes from Philadelphia Office of the Controller (https://controller.phila.gov/philadelphia-audits/mapping-the-legacy-of-structural-racism-in-philadelphia/) .
+The historic Redlining data comes from [Philadelphia Office of the Controller](https://controller.phila.gov/philadelphia-audits/mapping-the-legacy-of-structural-racism-in-philadelphia/) .
 
-```{r}
+```{r, include=FALSE}
 
 Redline <- st_read("data/independent/redlining.geojson")%>%
   st_transform(crs = 2272)
