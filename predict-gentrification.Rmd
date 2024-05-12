@@ -67,7 +67,6 @@ inflationAdjust2018 <- 1.0244
 # Color palette
 palette2 <- c('#6683a9', '#BF4146')
 palette5 <- c('#BF4146', '#E5A186', '#F1C8BB', '#B3CADB','#6683a9')
-c('#A62C2C', '#BF4146', '#faf2e6', '#80a1c2', '#6683a9')
 
 ```
 
@@ -547,29 +546,29 @@ grid.arrange(
 
 The model needs multiple spatial and non-spatial data as possible independent variable. The first step here is to collect and read those data. The list includes: (17,18)
 
-$Demographic and Housing characteristics$
-1. Age (youth)
-2. Geographical Mobility: different housing 1 years ago
-3. Family structure
-4. Bachelor Degree Attainment
-5. Occupied Rate/ Renter Rate
-6. Housing Structure
-7. Poplation Density
+__Demographic and Housing characteristics__
+1. Age (youth)  
+2. Geographical Mobility: different housing 1 years ago  
+3. Family structure  
+4. Bachelor Degree Attainment  
+5. Occupied Rate/ Renter Rate  
+6. Housing Structure  
+7. Population Density  
 
-$Amenities$
-8. School
-9. Parks
-10. Metro Station
+__Amenities__
+8. School  
+9. Parks  
+10. Metro Station  
 
-$Safety$
-11. Burglary
+__Safety__
+11. Burglary  
 
-$Redlining$
-12. Redlining
+__Redlining__
+12. Redlining  
 
 ### Demographic and Housing characteristics
 
-```{r}
+```{r, include = FALSE}
 
 #2017
 Demo2017 <- get_acs(geography = "block group", 
@@ -686,14 +685,130 @@ Demo2018 <- get_acs(geography = "block group",
 
 ```
 
+```{r, eval = FALSE}
+
+#2017
+Demo2017 <- get_acs(geography = "block group", 
+          survey = "acs5",
+          variables = c("B01001_001E",  
+                        # TOTALPOP
+                        
+                        "B01001_007E","B01001_008E","B01001_009E","B01001_010E","B01001_011E",
+                        "B01001_031E","B01001_032E","B01001_033E","B01001_034E","B01001_035E",
+                        # 18-30
+                        
+                        "B07201_001E","B07201_002E",
+                        #Same house
+                        
+                        "B11016_001E","B11016_009E",
+                        #hh type, non-family hh
+                        
+                        "B15002_015E","B15002_016E","B15002_017E","B15002_018E",
+                        "B15002_032E","B15002_033E","B15002_034E","B15002_035E",
+                        #Education attainment, Bachelor Degree
+                        
+                        "B25001_001E",
+                        #HU
+                        "B25002_002E","B25003_003E",
+                        #Occupied, RENTER OCCUPIED
+                        
+                        "B25018_001E"
+                        #MEDIAN NUMBER OF ROOMS
+                        ), 
+          year = 2017, 
+          state = "42", 
+          county = "101", 
+          geometry = T, 
+          output = "wide") %>%
+  st_transform(crs = 2272) %>%
+  rename(TotalPop = B01001_001E,
+         TotalHH = B11016_001E,
+         NumbernonFamilyHH = B11016_009E,
+         TotalHU=B25001_001E,
+         NumberOccupied=B25002_002E,
+         NumberRenter = B25003_003E,
+         MedNumRooms = B25018_001E) %>%
+  mutate(NumberYouth=B01001_007E+B01001_008E+B01001_009E+B01001_010E+B01001_011E+
+           B01001_031E+B01001_032E+B01001_033E+B01001_034E+B01001_035E,
+         NumberBachelor = B15002_015E+B15002_016E+B15002_017E+B15002_018E+
+                        B15002_032E+B15002_033E+B15002_034E+B15002_035E,
+         area_m2 = (as.numeric(st_area(.))*0.0929))%>%
+  mutate(pctYouth = NumberYouth / TotalPop,
+         prcMove = 1-(B07201_002E/B07201_001E),
+         pctnonFamilyHH= NumbernonFamilyHH / TotalHH,
+         pctOccupied = NumberOccupied/TotalHU,
+         pctRent = NumberRenter / NumberOccupied,
+         pctBachelor = NumberBachelor / TotalPop,
+         PopDensity=TotalPop/area_m2)%>%
+  select(-starts_with("B"),-NAME,-TotalPop,-TotalHH,-NumbernonFamilyHH,-TotalHU,
+         -NumberOccupied,-NumberRenter,-NumberYouth,-NumberBachelor,-area_m2)
+
+
+#2018
+Demo2018 <- get_acs(geography = "block group", 
+          survey = "acs5",
+          variables = c("B01001_001E",  
+                        # TOTALPOP
+                        
+                        "B01001_007E","B01001_008E","B01001_009E","B01001_010E","B01001_011E",
+                        "B01001_031E","B01001_032E","B01001_033E","B01001_034E","B01001_035E",
+                        # 18-30
+                        
+                        "B07201_001E","B07201_002E",
+                        #Same house
+                        
+                        "B11016_001E","B11016_009E",
+                        #hh type, non-family hh
+                        
+                        "B15002_015E","B15002_016E","B15002_017E","B15002_018E",
+                        "B15002_032E","B15002_033E","B15002_034E","B15002_035E",
+                        #Education attainment, Bachelor Degree
+                        
+                        "B25001_001E",
+                        #HU
+                        "B25002_002E","B25003_003E",
+                        #Occupied, RENTER OCCUPIED
+                        
+                        "B25018_001E"
+                        #MEDIAN NUMBER OF ROOMS
+                        ), 
+          year = 2018, 
+          state = "42", 
+          county = "101", 
+          geometry = T, 
+          output = "wide") %>%
+  st_transform(crs = 2272) %>%
+  rename(TotalPop = B01001_001E,
+         TotalHH = B11016_001E,
+         NumbernonFamilyHH = B11016_009E,
+         TotalHU=B25001_001E,
+         NumberOccupied=B25002_002E,
+         NumberRenter = B25003_003E,
+         MedNumRooms = B25018_001E) %>%
+  mutate(NumberYouth=B01001_007E+B01001_008E+B01001_009E+B01001_010E+B01001_011E+
+           B01001_031E+B01001_032E+B01001_033E+B01001_034E+B01001_035E,
+         NumberBachelor = B15002_015E+B15002_016E+B15002_017E+B15002_018E+
+                        B15002_032E+B15002_033E+B15002_034E+B15002_035E,
+         area_m2 = (as.numeric(st_area(.))*0.0929))%>%
+  mutate(pctYouth = NumberYouth / TotalPop,
+         prcMove = 1-(B07201_002E/B07201_001E),
+         pctnonFamilyHH= NumbernonFamilyHH / TotalHH,
+         pctOccupied = NumberOccupied/TotalHU,
+         pctRent = NumberRenter / NumberOccupied,
+         pctBachelor = NumberBachelor / TotalPop,
+         PopDensity=TotalPop/area_m2)%>%
+  select(-starts_with("B"),-NAME,-TotalPop,-TotalHH,-NumbernonFamilyHH,-TotalHU,
+         -NumberOccupied,-NumberRenter,-NumberYouth,-NumberBachelor,-area_m2)
+
+```
 
 ### Amenities
 
 #### School
 
-Education amenities is one of the independent variable we considered. 
+Education amenities is one of the independent variable we considered.  
 
-The school data comes from The School District of Philadelphia's [School Lists](https://www.philasd.org/performance/programsservices/open-data/school-information/#school_lists) dataset. 
+The school data comes from The School District of Philadelphia's [School Lists](https://www.philasd.org/performance/programsservices/open-data/school-information/#school_lists) dataset.  
 
 ```{r, include=FALSE}
 #2017
@@ -704,7 +819,7 @@ school2018<- st_read("data/independent/2018-2019 Master School List (20190510).c
 
 ```
 
-We need to change the csv data into geom data and select the information we need. 
+We need to change the csv data into geom data and select the information we need.  
 
 ```{r}
 
@@ -724,9 +839,6 @@ school2018<-school2018%>%
   st_as_sf(., coords = c("longitude", "latitude"), crs = 4326)%>%
   st_transform(crs = 2272)
 
-```
-
-```{r}
 
 #2017
 school_block2017 <- st_join(school2017, Demo2017) %>%
@@ -741,6 +853,7 @@ school_block2018 <- st_join(school2018, Demo2018) %>%
   st_drop_geometry() 
 
 ```
+
 
 #### Park
 
@@ -897,10 +1010,6 @@ data2018<-Demo2018%>%
   left_join(.,Redline_block, by ="GEOID")
   
 
-```
-
-```{r}
-
 #2017
 
 data2017 <- data2017%>%
@@ -921,19 +1030,30 @@ data2018 <- data2018%>%
   mutate(park.factor= case_when(  park == 0 ~ "0",  park == 1 ~ "1",  park == 2 ~ "2",  park > 2 ~"over 2")) %>%
   mutate(station = replace_na(station, 0) )%>%
   mutate(station.factor= case_when(  station == 0 ~ "0",  station == 1 ~ "1",  station > 1 ~"over 1")) %>%
-  mutate(Burglary = replace_na(Burglary, 0) ) 
+  mutate(Burglary = replace_na(Burglary, 0) )
+
+
+data2018_summary<- data2018 %>%
+  st_drop_geometry() %>%
+  select(-GEOID, -holc_grade, -school.factor, -park.factor, -station.factor) 
+
+# stargazer(data2018_summary, type = "text", digits = 1, title = "Summary Statistics")
+
+summary_data <- round(do.call(cbind, lapply(data2018_summary, summary)), digits = 2)
+
+as.data.frame(t(summary_data)) %>%
+  select(-"NA's") %>%
+  rename('Minimum' = 'Min.',
+         '1st Quantile' = '1st Qu.',
+         '3rd Quantile' = '3rd Qu.',
+         'Maximun' = 'Max.') %>%
+  kable(caption = "Summary of Quantitative Independent Variables") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))%>%
+  footnote(general_title = "\n", general = "Table 1")
 
 ```
 
-```{r preview the data}
 
-data2018_summary<- data2018%>%
-  st_drop_geometry()%>%
-  select(-GEOID)
-
-stargazer(data2018_summary, type = "text", digits = 1, title = "Summary Statistics")
-
-```
 
 ## Model development
 
@@ -968,7 +1088,7 @@ Gentrification.test <- data2018[-inTrain,]
 
 using our finalized model 6, specific model selection could refer to appendix.
 
-```{r Correlation, fig.height=7, fig.width=10}
+```{r, include = FALSE}
 
 model <- glm(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
                 school+park+station.factor+Burglary+holc_grade, 
@@ -976,21 +1096,29 @@ model <- glm(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOcc
                      dplyr::select(-GEOID, -geometry),
                   family="binomial" (link="logit"))
 
+fit_metrics <- pR2(model)
+
 ```
 
+```{r, eval = FALSE}
 
-```{r fit_metrics, warning = FALSE, message = FALSE, results='hide'}
-
-pR2(model)
-
-#Kable to show the result
+model <- glm(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
+                school+park+station.factor+Burglary+holc_grade, 
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
 
 fit_metrics <- pR2(model)
-fit_metrics_df <- as.data.frame(t(fit_metrics))
 
-kable(fit_metrics_df, caption = "Fit Metrics for Logistic Regression Model", align = 'r', digits = 4) %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
-  footnote(general_title = "\n", general = "Table 2") 
+```
+
+```{r}
+
+as.data.frame(t(fit_metrics)) %>%
+  kable(caption = "Fit Metrics for Logistic Regression Model", digits = 4) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))%>%
+  footnote(general_title = "\n", general = "Table 2")
+
 ```
 
 
@@ -1018,14 +1146,15 @@ testProbs %>%
   group_by(Variable) %>%
   summarize(Specificity = round(yardstick::sens_vec(Outcome,factor(Value)),2),
             Sensitivity = round(yardstick::spec_vec(Outcome,factor(Value)),2),
-            Accuracy = round(yardstick::accuracy_vec(Outcome,factor(Value)),2)) %>% 
-  kable() %>%
-  kable_styling(full_width = F)
+            Accuracy = round(yardstick::accuracy_vec(Outcome,factor(Value)),2)) %>%
+  kable(caption = "Optimize Threshold") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))%>%
+  footnote(general_title = "\n", general = "Table 3")
 
 ```
 
 
-### Correlation matrix
+### Confusion matrix
 
 use the optimized thershold 0.1
 
@@ -1040,14 +1169,28 @@ testProbs <-
   mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.1 , 1, 0)))
 
 
-caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
+cm <- caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
                        positive = "1")
+
+mosaicplot(cm$table, color=palette2, main = "Mosaic Plot for Confusion Matrix",
+           xlab = "Prediction", ylab = "Reference")
+
+cm_df <- as.data.frame(round(cm$byClass, digit = 3)) %>% 
+  head(5) %>%
+  t()
+
+rownames(cm_df) <- NULL
+
+cm_df %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))  %>%
+  footnote(general_title = "\n", general = "Table 4")
 
 ```
 
 ### Cross validation
 
-```{r}
+```{r, include = FALSE}
 
 data2018$Gentrification <- as.factor(data2018$Gentrification)
 
@@ -1075,6 +1218,45 @@ cvFit
 
 ```
 
+```{r, eval = FALSE}
+
+data2018$Gentrification <- as.factor(data2018$Gentrification)
+
+levels(data2018$Gentrification) <- make.names(levels(data2018$Gentrification))
+
+
+ctrl <- trainControl(
+  method = "cv",
+  number = 100,
+  classProbs = TRUE, 
+  summaryFunction = twoClassSummary
+)
+
+cvFit <- train(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
+                school+park+station.factor+Burglary+holc_grade,
+  data = data2018 %>%
+    dplyr::select(-GEOID, -geometry),
+  method = "glm",
+  family = "binomial",
+  metric = "ROC",
+  trControl = ctrl
+)
+
+cvFit
+
+```
+
+```{r}
+
+cvFit_df <- as.data.frame(cvFit$results)[, 2:7]
+cvFit_df %>% 
+  kable(col.name=c('ROC', 'Sensitivity', 'Specificity', 'ROC SD', 'Sensitivity SD', 'Specificity SD'),caption = "Cross Validation", digits = 4) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))  %>%
+  footnote(general_title = "\n", general = "Table 5")
+
+```
+
+
 ### Make Predictions
 
 ```{r}
@@ -1086,11 +1268,12 @@ testProbs <- data.frame(Outcome = as.factor(Gentrification.test$Gentrification),
 ggplot(testProbs, aes(x = Probs, fill = as.factor(Outcome))) + 
   geom_density() +
   facet_grid(Outcome ~ .) +
-  scale_fill_manual(values = c("pink","purple")) +
-  labs(x = "Click", y = "Density of probabilities",
-       title = "Distribution of predicted probabilities by observed outcome") +
-  theme(strip.text.x = element_text(size = 18),
-        legend.position = "none")
+  scale_fill_manual(values = palette2) +
+  labs(x = "Probabilities", y = "Density of probabilities",
+       title = "Distribution of predicted probabilities by observed outcome",
+             subtitle = "No gentrification = 0, Gentrification = 1") +
+  theme_minimal() +
+  theme(legend.position = "none") 
 
 ```
 
@@ -1099,12 +1282,11 @@ ggplot(testProbs, aes(x = Probs, fill = as.factor(Outcome))) +
 ```{r}
 
 ggplot(testProbs, aes(d = as.numeric(Outcome), m = Probs)) +
-  geom_roc(n.cuts = 50, labels = FALSE, colour = "#FF82AB") +
+  geom_roc(n.cuts = 50, labels = FALSE, colour = "#BF4146") +
   style_roc(theme = theme_grey) +
-  geom_abline(slope = 1, intercept = 0, size = 1.5, color = 'grey') +
+  geom_abline(slope = 1, intercept = 0, size = 1, color = '#6683a9') +
   labs(title = "ROC Curve") +
   theme_minimal()
-
 
 ```
 
@@ -1121,12 +1303,23 @@ testProbs <-
   testProbs %>%
   mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.1 , 1, 0)))
 
-caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
+
+cm <- caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
                        positive = "1")
 
+cm_df <- as.data.frame(round(cm$byClass, digit = 3)) %>% 
+  head(5) %>%
+  t()
+
+rownames(cm_df) <- NULL
+
+cm_df %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))  %>%
+  footnote(general_title = "\n", general = "Table 6")
 ```
 
-### Validation
+## Validation
 
 Validate using the 2017 Data
 and compared with the 2018 model results
@@ -1166,9 +1359,9 @@ validationProbs$predOutcome <- factor(validationProbs$predOutcome, levels = leve
 
 ```
 
-#### 2017 Crossvalidation
+### 2017 Cross Validation
 
-```{r 2017 cv}
+```{r 2017 cv, include=FALSE}
 cvFit <- train(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
                 school+park+station.factor+Burglary+holc_grade,
   data = data2017 %>%
@@ -1182,52 +1375,89 @@ cvFit <- train(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctO
 cvFit
 ```
 
-#### 2017 Confusion Matrix
+```{r, eval=FALSE}
+cvFit <- train(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
+                school+park+station.factor+Burglary+holc_grade,
+  data = data2017 %>%
+    dplyr::select(-GEOID, -geometry),
+  method = "glm",
+  family = "binomial",
+  metric = "ROC",
+  trControl = ctrl
+)
+
+cvFit
+```
+
+```{r}
+
+cvFit_df <- as.data.frame(cvFit$results)[, 2:7]
+cvFit_df %>% 
+  kable(col.name=c('ROC', 'Sensitivity', 'Specificity', 'ROC SD', 'Sensitivity SD', 'Specificity SD'),caption = "Cross Validation", digits = 4) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))  %>%
+  footnote(general_title = "\n", general = "Table 7")
+
+```
+
+### 2017 Confusion Matrix
 
 ```{r 2017 Confusion Matrix}
 
 # Now, run the confusion matrix
 confusionMatrix <- caret::confusionMatrix(validationProbs$predOutcome, validationProbs$Outcome, positive = "1")
-print(confusionMatrix)
+
+confusionMatrix_df <- as.data.frame(round(confusionMatrix$byClass, digit = 3)) %>% 
+  head(5) %>%
+  t()
+
+rownames(confusionMatrix_df) <- NULL
+
+confusionMatrix_df %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))  %>%
+  footnote(general_title = "\n", general = "Table 8")
 
 ```
 ```{r}
-ggplot(validationProbs, aes(x = Probs, fill = as.factor(Outcome))) + 
+
+ggplot(testProbs, aes(x = Probs, fill = as.factor(Outcome))) + 
   geom_density() +
   facet_grid(Outcome ~ .) +
-  scale_fill_manual(values = c("pink","purple")) +
-  labs(x = "Click", y = "Density of probabilities",
-       title = "Distribution of predicted probabilities by observed outcome") +
-  theme(strip.text.x = element_text(size = 18),
-        legend.position = "none")
+  scale_fill_manual(values = palette2) +
+  labs(x = "Probabilities", y = "Density of probabilities",
+       title = "Distribution of predicted probabilities by observed outcome",
+             subtitle = "No gentrification = 0, Gentrification = 1") +
+  theme_minimal() +
+  theme(legend.position = "none") 
+
 ```
 
-#### 2017 ROC Curve
+### 2017 ROC Curve
 
 ```{r}
+
 ggplot(validationProbs, aes(d = as.numeric(Outcome), m = Probs)) +
-  geom_roc(n.cuts = 50, labels = FALSE, colour = "#FF82AB") +
+  geom_roc(n.cuts = 50, labels = FALSE, colour = "#BF4146") +
   style_roc(theme = theme_grey) +
-  geom_abline(slope = 1, intercept = 0, size = 1.5, color = 'grey') +
+  geom_abline(slope = 1, intercept = 0, size = 1, color = '#6683a9') +
   labs(title = "ROC Curve") +
   theme_minimal()
 
-
 ```
 
 
 
-### Summary
+## Summary
 
 why invest recommendation for implementation
 
-### Appendix
+## Appendix
 
 data source, variable definition, model specification
 
-#### Model specification
+### Model specification
 
-```{r}
+```{r fig.height=8, fig.width=8}
 
 numericVars <- data2018 %>%
   st_drop_geometry() %>%  
@@ -1236,17 +1466,23 @@ numericVars <- data2018 %>%
 
 correlation_matrix <- cor(numericVars)
 
+
 numericVars %>% 
   correlate() %>% 
   autoplot() +
-  geom_text(aes(label = round(r,digits=2)),size = 2)
+  geom_tile(aes(fill = r), color = "#e9e9e9") +
+  geom_text(aes(label = round(r,digits=2)), size = 3) +
+  scale_fill_gradient2(low = "#6683a9", mid = "white", high = "#BF4146",  # Specify color gradient
+                       midpoint = 0, limits = c(-1, 1),
+                       breaks = seq(-1, 1, by = 0.2)) +
+  labs(title = "Correlation across numeric variables")  # Set plot title
 
 ```
 
 
-##### Basic model
+### Basic model
 
-```{r}
+```{r, include=FALSE}
 
 model1 <- glm(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity,
              data = as.data.frame(Gentrification.training) %>% 
@@ -1294,19 +1530,81 @@ model8 <- glm(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOc
                      dplyr::select(-GEOID, -geometry),
                   family="binomial" (link="logit"))
 
+
+modelList <- paste0("model", 1:8)
+bar <- map_dfc(modelList, function(x)pR2(get(x)))[4,] %>%
+  setNames(paste0("model",1:8)) %>%
+  gather(model,McFadden) 
+
+```
+
+```{r, eval=FALSE}
+
+model1 <- glm(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity,
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
+
+model2 <- glm(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+log(PopDensity), 
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
+
+model3 <- glm(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
+                school+park, 
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
+
+model4 <- glm(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
+                school+park+station, 
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
+
+model5 <- glm(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
+                school+park+station+Burglary+holc_grade, 
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
+
+model6 <- glm(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
+                school+park+station.factor+Burglary+holc_grade, 
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
+
+model7 <- glm(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
+                school.factor+park+station.factor+Burglary+holc_grade, 
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
+
+model8 <- glm(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
+                school.factor+park.factor+station.factor+Burglary+holc_grade, 
+             data = as.data.frame(Gentrification.training) %>% 
+                     dplyr::select(-GEOID, -geometry),
+                  family="binomial" (link="logit"))
+
+
+modelList <- paste0("model", 1:8)
+bar <- map_dfc(modelList, function(x)pR2(get(x)))[4,] %>%
+  setNames(paste0("model",1:8)) %>%
+  gather(model,McFadden) 
+
 ```
 
 ```{r}
 
-modelList <- paste0("model", 1:8)
-map_dfc(modelList, function(x)pR2(get(x)))[4,] %>%
-  setNames(paste0("model",1:8)) %>%
-  gather(model,McFadden) %>%
-  ggplot(aes(model,McFadden)) +
-    geom_bar(stat="identity") +
-    labs(title= "McFadden R-Squared by Model") 
+bar %>%
+  ggplot(aes(model, McFadden)) +
+    geom_bar(stat="identity", fill="#BF4146") +
+    labs(title= "McFadden R-Squared by Model") +
+    theme_minimal()
 
 ```
+
+
 ### AIC
 
 ```{r}
@@ -1315,10 +1613,16 @@ aic_values <- c(AIC(model1), AIC(model2), AIC(model3), AIC(model4), AIC(model5),
 
 # Create a data frame to store model numbers and corresponding AIC values
 model_comparison <- data.frame(Model = c("Model 1", "Model 2", "Model 3", "Model 4","Model 5", "Model 6", "Model 7", "Model 8"),
-                                AIC = aic_values)
+                                AIC = aic_values) %>%
+                                t()
+
+colnames(model_comparison) <- as.character(model_comparison[1, ])  # Set column names to values in the first row
+model_comparison <- model_comparison[-1, , drop = FALSE]  # Remove the first row
 
 # Create a table using kable
-kable(model_comparison, caption = "Comparison of AIC values")
+kable(model_comparison, caption = "Comparison of AIC values") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))  %>%
+  footnote(general_title = "\n", general = "Table 9")
 
 ```
 
@@ -1326,7 +1630,7 @@ kable(model_comparison, caption = "Comparison of AIC values")
 
 ### Cross validation
 
-```{r}
+```{r, include=FALSE}
 
 data2018$Gentrification <- as.factor(data2018$Gentrification)
 
@@ -1341,7 +1645,7 @@ ctrl <- trainControl(
 )
 
 #model5
-cvFit <- train(
+cvFit5 <- train(
   Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
                 school+park+station+Burglary+holc_grade,
   data = data2018 %>%
@@ -1352,14 +1656,8 @@ cvFit <- train(
   trControl = ctrl
 )
 
-cvFit
-
-```
-
-```{r}
-
 #model6
-cvFit <- train(
+cvFit6 <- train(
   Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
                 school+park+station.factor+Burglary+holc_grade,
   data = data2018 %>%
@@ -1370,14 +1668,8 @@ cvFit <- train(
   trControl = ctrl
 )
 
-cvFit
-
-```
-
-```{r}
-
 #model7
-cvFit <- train(
+cvFit7 <- train(
   Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
                 school.factor+park+station.factor+Burglary+holc_grade,
   data = data2018 %>%
@@ -1388,14 +1680,8 @@ cvFit <- train(
   trControl = ctrl
 )
 
-cvFit
-
-```
-
-```{r}
-
 #model8
-cvFit <- train(
+cvFit8 <- train(
   Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
                 school.factor+park.factor+station.factor+Burglary+holc_grade,
   data = data2018 %>%
@@ -1406,14 +1692,94 @@ cvFit <- train(
   trControl = ctrl
 )
 
-cvFit
+```
+
+```{r, eval=FALSE}
+
+data2018$Gentrification <- as.factor(data2018$Gentrification)
+
+levels(data2018$Gentrification) <- make.names(levels(data2018$Gentrification))
+
+
+ctrl <- trainControl(
+  method = "cv",
+  number = 100,
+  classProbs = TRUE, 
+  summaryFunction = twoClassSummary
+)
+
+#model5
+cvFit5 <- train(
+  Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
+                school+park+station+Burglary+holc_grade,
+  data = data2018 %>%
+    dplyr::select(-GEOID, -geometry),
+  method = "glm",
+  family = "binomial",
+  metric = "ROC",
+  trControl = ctrl
+)
+
+#model6
+cvFit6 <- train(
+  Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
+                school+park+station.factor+Burglary+holc_grade,
+  data = data2018 %>%
+    dplyr::select(-GEOID, -geometry),
+  method = "glm",
+  family = "binomial",
+  metric = "ROC",
+  trControl = ctrl
+)
+
+#model7
+cvFit7 <- train(
+  Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
+                school.factor+park+station.factor+Burglary+holc_grade,
+  data = data2018 %>%
+    dplyr::select(-GEOID, -geometry),
+  method = "glm",
+  family = "binomial",
+  metric = "ROC",
+  trControl = ctrl
+)
+
+#model8
+cvFit8 <- train(
+  Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
+                school.factor+park.factor+station.factor+Burglary+holc_grade,
+  data = data2018 %>%
+    dplyr::select(-GEOID, -geometry),
+  method = "glm",
+  family = "binomial",
+  metric = "ROC",
+  trControl = ctrl
+)
+
+```
+
+```{r}
+
+cvFit_df5 <- as.data.frame(cvFit5$results)[, 2:7]
+cvFit_df6 <- as.data.frame(cvFit6$results)[, 2:7]
+cvFit_df7 <- as.data.frame(cvFit7$results)[, 2:7]
+cvFit_df8 <- as.data.frame(cvFit8$results)[, 2:7]
+
+cvFit_combine <- rbind(cvFit_df5, cvFit_df6, cvFit_df7, cvFit_df8)
+row.names(cvFit_combine) <- c("Model 5", "Model 6", "Model 7", "Model 8")
+
+cvFit_combine %>% 
+  kable(col.name=c('ROC', 'Sensitivity', 'Specificity', 'ROC SD', 'Sensitivity SD', 'Specificity SD'),caption = "Cross Validation", digits = 4) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))  %>%
+  footnote(general_title = "\n", general = "Table 10")
+
 
 ```
 
 choose model6 as our best model
 
 
-#### References
+## References
 
 “Definition of GENTRIFICATION.” In Merriam-Webster, April 29, 2024. https://www.merriam-webster.com/dictionary/gentrification.  
 
