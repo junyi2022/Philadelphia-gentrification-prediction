@@ -803,26 +803,7 @@ model <- glm(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOcc
 
 ```
 
-An overview of the association between gentrification and multiple independent variables, exploring the positive or negative correlations and their statistical significance.
 
-```{r}
-Gentrification_sum <- summary(model)
-
-coefficients_table <- as.data.frame(Gentrification_sum$coefficients)
-
-coefficients_table$significance <- ifelse(coefficients_table$`Pr(>|z|)` < 0.001, '***',
-                                         ifelse(coefficients_table$`Pr(>|z|)` < 0.01, '**',
-                                                ifelse(coefficients_table$`Pr(>|z|)` < 0.05, '*',
-                                                       ifelse(coefficients_table$`Pr(>|z|)` < 0.1, '.', ''))))
-
-coefficients_table$p_value <- paste0(round(coefficients_table$`Pr(>|z|)`, digits = 3), coefficients_table$significance)
-
-coefficients_table %>%
-  select(-significance, -`Pr(>|z|)`) %>% 
-  kable(align = "r") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))  %>%
-  footnote(general_title = "\n", general = "Table 1")
-```
 ```{r fit_metrics, warning = FALSE, message = FALSE, results='hide'}
 
 pR2(model)
@@ -920,6 +901,7 @@ cvFit
 ```
 
 ### Make Predictions
+
 ```{r}
 
 testProbs <- data.frame(Outcome = as.factor(Gentrification.test$Gentrification),
@@ -951,7 +933,23 @@ ggplot(testProbs, aes(d = as.numeric(Outcome), m = Probs)) +
 
 ```
 
-### Result of model testing
+
+
+
+#### Confusion Matrix
+
+We employ a threshold of 0.05 to optimize the sensitivity. We want a better sensitivity. A good sensitivity means that our model could correctly identify  True Positive, the gentrification block groups. Effective sensitivity empowers governments to implement targeted interventions in these areas, mitigating or reducing future gentrification.
+
+```{r}
+
+testProbs <- 
+  testProbs %>%
+  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.1 , 1, 0)))
+
+caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
+                       positive = "1")
+
+```
 
 ### Validation
 
@@ -993,6 +991,7 @@ validationProbs$predOutcome <- factor(validationProbs$predOutcome, levels = leve
 
 ```
 
+#### 2017 Crossvalidation
 
 ```{r 2017 cv}
 cvFit <- train(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctOccupied+pctRent+pctBachelor+PopDensity+
@@ -1008,6 +1007,8 @@ cvFit <- train(Gentrification ~ MedNumRooms+pctYouth+pctnonFamilyHH+prcMove+pctO
 cvFit
 ```
 
+#### 2017 Confusion Matrix
+
 ```{r 2017 Confusion Matrix}
 
 # Now, run the confusion matrix
@@ -1015,8 +1016,18 @@ confusionMatrix <- caret::confusionMatrix(validationProbs$predOutcome, validatio
 print(confusionMatrix)
 
 ```
+```{r}
+ggplot(validationProbs, aes(x = Probs, fill = as.factor(Outcome))) + 
+  geom_density() +
+  facet_grid(Outcome ~ .) +
+  scale_fill_manual(values = c("pink","purple")) +
+  labs(x = "Click", y = "Density of probabilities",
+       title = "Distribution of predicted probabilities by observed outcome") +
+  theme(strip.text.x = element_text(size = 18),
+        legend.position = "none")
+```
 
-### ROC Curve
+#### 2017 ROC Curve
 
 ```{r}
 ggplot(validationProbs, aes(d = as.numeric(Outcome), m = Probs)) +
