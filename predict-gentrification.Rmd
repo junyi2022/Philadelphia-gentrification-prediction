@@ -63,10 +63,12 @@ library(stargazer)
 
 
 # inflation rate for 2017 is *2.13%*, for 2018 is *2.44%*, for 2019 is *1.81%*, for 2020 is *1.23%*.  
+inflationAdjust2016 <- 1.0126
 inflationAdjust2017 <- 1.0213
 inflationAdjust2018 <- 1.0244
-# inflationAdjust2019 <- 1.0181
-# inflationAdjust2020 <- 1.0123
+inflationAdjust2019 <- 1.0181
+inflationAdjust2020 <- 1.0123
+inflationAdjust2021 <- 1.047
 
 ```
 
@@ -101,6 +103,21 @@ __In summary, our method to calculate gentrification is:__
 The census data we need to collect for calculating gentrification is ACS 5-year data from 2017 to 2019, and the geography is census block groups in Philadelphia. The demographic data we need to collect or calculate are total population, percentage of non-white population, and median household income.    
 
 ```{r, include = FALSE}
+
+census2016 <- get_acs(geography = "block group", 
+          survey = "acs5",
+          variables = c("B01001_001E", "B02001_002E", "B19013_001E"), 
+          year = 2016, 
+          state = "42", 
+          county = "101", 
+          geometry = T, 
+          output = "wide") %>%
+  st_transform(crs = 2272) %>%
+  rename(TotalPop = B01001_001E,
+         NumberWhites = B02001_002E,
+         MedHhIncome = B19013_001E) %>%
+  mutate(pctNonWhite = 1 - NumberWhites / TotalPop)%>%
+  select(-NAME, -B01001_001M, -B02001_002M, -B19013_001M)
 
 census2017 <- get_acs(geography = "block group", 
           survey = "acs5",
@@ -147,12 +164,45 @@ census2019 <- get_acs(geography = "block group",
   mutate(pctNonWhite = 1 - NumberWhites / TotalPop)%>%
   select(-NAME, -B01001_001M, -B02001_002M, -B19013_001M)
 
+census2020 <- get_acs(geography = "block group", 
+          survey = "acs5",
+          variables = c("B01001_001E", "B02001_002E", "B19013_001E"), 
+          year = 2020, 
+          state = "42", 
+          county = "101", 
+          geometry = T, 
+          output = "wide") %>%
+  st_transform(crs = 2272) %>%
+  rename(TotalPop = B01001_001E,
+         NumberWhites = B02001_002E,
+         MedHhIncome = B19013_001E) %>%
+  mutate(pctNonWhite = 1 - NumberWhites / TotalPop)%>%
+  select(-NAME, -B01001_001M, -B02001_002M, -B19013_001M)
+
+census2021 <- get_acs(geography = "block group", 
+          survey = "acs5",
+          variables = c("B01001_001E", "B02001_002E", "B19013_001E"), 
+          year = 2021, 
+          state = "42", 
+          county = "101", 
+          geometry = T, 
+          output = "wide") %>%
+  st_transform(crs = 2272) %>%
+  rename(TotalPop = B01001_001E,
+         NumberWhites = B02001_002E,
+         MedHhIncome = B19013_001E) %>%
+  mutate(pctNonWhite = 1 - NumberWhites / TotalPop)%>%
+  select(-NAME, -B01001_001M, -B02001_002M, -B19013_001M)
+
 ```
 
 
 Since one of our criteria needs to compare median income to Philadelphia County's value. We need to calculate the median difference between each block group and the larger geography (Philadelphia) for the selected three years. Because some of the block groups do not have median household income value data from the census survey, we will keep the household income difference for those as NA.   
 
 ```{r}
+
+census2016 <- census2016 %>%
+  mutate(MedHhIncomeDif = ifelse(is.na(census2016$MedHhIncome), NA, census2016$MedHhIncome - median(na.omit(census2016$MedHhIncome))))
 
 census2017 <- census2017 %>%
   mutate(MedHhIncomeDif = ifelse(is.na(census2017$MedHhIncome), NA, census2017$MedHhIncome - median(na.omit(census2017$MedHhIncome))))
@@ -162,6 +212,12 @@ census2018 <- census2018 %>%
 
 census2019 <- census2019 %>%
   mutate(MedHhIncomeDif = ifelse(is.na(census2019$MedHhIncome), NA, census2019$MedHhIncome - median(na.omit(census2019$MedHhIncome))))
+
+census2020 <- census2020 %>%
+  mutate(MedHhIncomeDif = ifelse(is.na(census2020$MedHhIncome), NA, census2020$MedHhIncome - median(na.omit(census2020$MedHhIncome))))
+
+census2021 <- census2021 %>%
+  mutate(MedHhIncomeDif = ifelse(is.na(census2021$MedHhIncome), NA, census2021$MedHhIncome - median(na.omit(census2021$MedHhIncome))))
 
 
 ```
@@ -177,9 +233,12 @@ Since our analysis needs 2017 to 2019's data, we will first extract these three 
 AssessData <- 
   read.csv(file.path("https://opendata-downloads.s3.amazonaws.com/assessments.csv")) 
 
+Assess2016 <- AssessData[AssessData$year == 2016, ]
 Assess2017 <- AssessData[AssessData$year == 2017, ]
 Assess2018 <- AssessData[AssessData$year == 2018, ]
 Assess2019 <- AssessData[AssessData$year == 2019, ]
+Assess2020 <- AssessData[AssessData$year == 2020, ]
+Assess2021 <- AssessData[AssessData$year == 2021, ]
 
 
 PWDparcel <- st_read("https://opendata.arcgis.com/datasets/84baed491de44f539889f2af178ad85c_0.geojson") %>%
@@ -194,6 +253,24 @@ In order to match the properties with the parcels, we use certain IDs to join th
 
 
 ```{r fig.width=10}
+
+# 2016
+
+assess_pwd_join_2016 <- inner_join(PWDparcel, Assess2016, join_by(BRT_ID == parcel_number))
+
+# Perform a spatial join between the census block groups and property value data
+joined_data_2016 <- st_join(census2016, assess_pwd_join_2016, join = st_intersects)
+
+# Aggregate median property value by census block group
+median_property_value_2016 <- aggregate(joined_data_2016["market_value"], by = list(joined_data_2016$GEOID), FUN = median) %>%
+  st_drop_geometry()
+
+# Rename the aggregated column
+names(median_property_value_2016)[2] <- "median_property_value"
+
+# Merge the aggregated median property value back to the census block groups sf object
+census2016 <- merge(census2016, median_property_value_2016, by.x = "GEOID", by.y = "Group.1", all.x = TRUE)
+
 
 # 2017
 
@@ -211,6 +288,23 @@ names(median_property_value_2017)[2] <- "median_property_value"
 
 # Merge the aggregated median property value back to the census block groups sf object
 census2017 <- merge(census2017, median_property_value_2017, by.x = "GEOID", by.y = "Group.1", all.x = TRUE)
+
+# 2018
+
+assess_pwd_join_2018 <- inner_join(PWDparcel, Assess2018, join_by(BRT_ID == parcel_number))
+
+# Perform a spatial join between the census block groups and property value data
+joined_data_2018 <- st_join(census2018, assess_pwd_join_2018, join = st_intersects)
+
+# Aggregate median property value by census block group
+median_property_value_2018 <- aggregate(joined_data_2018["market_value"], by = list(joined_data_2018$GEOID), FUN = median) %>%
+  st_drop_geometry()
+
+# Rename the aggregated column
+names(median_property_value_2018)[2] <- "median_property_value"
+
+# Merge the aggregated median property value back to the census block groups sf object
+census2018 <- merge(census2018, median_property_value_2018, by.x = "GEOID", by.y = "Group.1", all.x = TRUE)
 
 
 # 2019
@@ -231,22 +325,40 @@ names(median_property_value_2019)[2] <- "median_property_value"
 census2019 <- merge(census2019, median_property_value_2019, by.x = "GEOID", by.y = "Group.1", all.x = TRUE)
 
 
-# 2018
+# 2021
 
-assess_pwd_join_2018 <- inner_join(PWDparcel, Assess2018, join_by(BRT_ID == parcel_number))
+assess_pwd_join_2021 <- inner_join(PWDparcel, Assess2021, join_by(BRT_ID == parcel_number))
 
 # Perform a spatial join between the census block groups and property value data
-joined_data_2018 <- st_join(census2018, assess_pwd_join_2018, join = st_intersects)
+joined_data_2021 <- st_join(census2021, assess_pwd_join_2021, join = st_intersects)
 
 # Aggregate median property value by census block group
-median_property_value_2018 <- aggregate(joined_data_2018["market_value"], by = list(joined_data_2018$GEOID), FUN = median) %>%
+median_property_value_2021 <- aggregate(joined_data_2021["market_value"], by = list(joined_data_2021$GEOID), FUN = median) %>%
   st_drop_geometry()
 
 # Rename the aggregated column
-names(median_property_value_2018)[2] <- "median_property_value"
+names(median_property_value_2021)[2] <- "median_property_value"
 
 # Merge the aggregated median property value back to the census block groups sf object
-census2018 <- merge(census2018, median_property_value_2018, by.x = "GEOID", by.y = "Group.1", all.x = TRUE)
+census2021 <- merge(census2021, median_property_value_2021, by.x = "GEOID", by.y = "Group.1", all.x = TRUE)
+
+
+# 2020
+
+assess_pwd_join_2020 <- inner_join(PWDparcel, Assess2020, join_by(BRT_ID == parcel_number))
+
+# Perform a spatial join between the census block groups and property value data
+joined_data_2020 <- st_join(census2020, assess_pwd_join_2020, join = st_intersects)
+
+# Aggregate median property value by census block group
+median_property_value_2020 <- aggregate(joined_data_2020["market_value"], by = list(joined_data_2020$GEOID), FUN = median) %>%
+  st_drop_geometry()
+
+# Rename the aggregated column
+names(median_property_value_2020)[2] <- "median_property_value"
+
+# Merge the aggregated median property value back to the census block groups sf object
+census2020 <- merge(census2020, median_property_value_2020, by.x = "GEOID", by.y = "Group.1", all.x = TRUE)
 
 ```
 
@@ -256,16 +368,15 @@ Because of standard for calculating gentrification involves change between two y
 
 ```{r}
 
-# 2017 to 2018
+# 2016 to 2017
 
-census2017_pctNonwhite <- census2017 %>%
+census2016_pctNonwhite <- census2016 %>%
   select(GEOID, pctNonWhite) %>%
   st_drop_geometry() %>% 
-  rename(pctNW_2017 = pctNonWhite)
+  rename(pctNW_2016 = pctNonWhite)
 
-census2018 <- merge(census2018, census2017_pctNonwhite, by.x = "GEOID", by.y = "GEOID", all.x = TRUE) %>%
-  mutate(NW_change_pct = (pctNonWhite - pctNW_2017) / pctNW_2017)
-
+census2017 <- merge(census2017, census2016_pctNonwhite, by.x = "GEOID", by.y = "GEOID", all.x = TRUE) %>%
+  mutate(NW_change_pct = (pctNonWhite - pctNW_2016) / pctNW_2016)
 
 # 2018 to 2019
 
@@ -277,22 +388,37 @@ census2018_pctNonwhite <- census2018 %>%
 census2019 <- merge(census2019, census2018_pctNonwhite, by.x = "GEOID", by.y = "GEOID", all.x = TRUE) %>%
   mutate(NW_change_pct = (pctNonWhite - pctNW_2018) / pctNW_2018)
 
+
+# 2020 to 2021
+
+census2020_pctNonwhite <- census2020 %>%
+  select(GEOID, pctNonWhite) %>%
+  st_drop_geometry() %>% 
+  rename(pctNW_2020 = pctNonWhite)
+
+census2021 <- merge(census2021, census2020_pctNonwhite, by.x = "GEOID", by.y = "GEOID", all.x = TRUE) %>%
+  mutate(NW_change_pct = (pctNonWhite - pctNW_2020) / pctNW_2020)
+
+# 2016 to 2018
+
+census2018_2 <- merge(census2018, census2016_pctNonwhite, by.x = "GEOID", by.y = "GEOID", all.x = TRUE) %>%
+  mutate(NW_change_pct = (pctNonWhite - pctNW_2016) / pctNW_2016)
+
 ```
 
 Secondly, we transfer the median household income difference and categorize this value. If the median household income one year ago is greater than the Philadelphia median, the census block group will get a `1`, and if the median household income one year ago is less than the Philadelphia median, the census block group will get a `0`. Besides, since we originally have some NA household income value, we will keep this new categorized value in those census block groups as NA.  
 
 ```{r}
 
-# 2017 to 2018
+# 2016 to 2017
 
-census2017_medianHHI <- census2017 %>%
+census2016_medianHHI <- census2016 %>%
   select(GEOID, MedHhIncomeDif) %>%
   st_drop_geometry() %>% 
-  mutate(MedHhIBool_2017 = ifelse(is.na(census2017$MedHhIncomeDif), NA, ifelse(census2017$MedHhIncomeDif < 0, 1, 0))) %>%
-  select(GEOID, MedHhIBool_2017)
+  mutate(MedHhIBool_2016 = ifelse(is.na(census2018$MedHhIncomeDif), NA, ifelse(census2016$MedHhIncomeDif < 0, 1, 0))) %>%
+  select(GEOID, MedHhIBool_2016)
 
-census2018 <- merge(census2018, census2017_medianHHI, by.x = "GEOID", by.y = "GEOID", all.x = TRUE)
-
+census2017 <- merge(census2017, census2016_medianHHI, by.x = "GEOID", by.y = "GEOID", all.x = TRUE)
 
 # 2018 to 2019
 
@@ -304,22 +430,36 @@ census2018_medianHHI <- census2018 %>%
 
 census2019 <- merge(census2019, census2018_medianHHI, by.x = "GEOID", by.y = "GEOID", all.x = TRUE)
 
+
+# 2020 to 2021
+
+census2020_medianHHI <- census2020 %>%
+  select(GEOID, MedHhIncomeDif) %>%
+  st_drop_geometry() %>% 
+  mutate(MedHhIBool_2020 = ifelse(is.na(census2020$MedHhIncomeDif), NA, ifelse(census2020$MedHhIncomeDif < 0, 1, 0))) %>%
+  select(GEOID, MedHhIBool_2020)
+
+census2021 <- merge(census2021, census2020_medianHHI, by.x = "GEOID", by.y = "GEOID", all.x = TRUE)
+
+# 2016 to 2018
+
+census2018_2 <- merge(census2018_2, census2016_medianHHI, by.x = "GEOID", by.y = "GEOID", all.x = TRUE)
+
 ```
 
 We also need to calculate the median value change within 1 year. In this way, we need to add the property value of 2017 in the 2018 dataframe and the property value of 2018 in the 2019 dataframe in order to calculate the difference. In order to calculate the percent change of the median property value, we also need to adjust for inflation.   
 
 ```{r}
 
-# 2017 to 2018
+# 2016 to 2017
 
-census2017_prop <- census2017 %>%
+census2016_prop <- census2016 %>%
   select(GEOID, median_property_value) %>%
   st_drop_geometry() %>% 
-  rename(median_pv_2017 = median_property_value)
+  rename(median_pv_2016 = median_property_value)
 
-census2018 <- merge(census2018, census2017_prop, by.x = "GEOID", by.y = "GEOID", all.x = TRUE) %>%
-  mutate(PV_change_pct = (median_property_value - median_pv_2017 * inflationAdjust2017) / median_pv_2017 * inflationAdjust2017)
-
+census2017 <- merge(census2017, census2016_prop, by.x = "GEOID", by.y = "GEOID", all.x = TRUE) %>%
+  mutate(PV_change_pct = (median_property_value - median_pv_2016 * inflationAdjust2016) / median_pv_2016 * inflationAdjust2016)
 
 # 2018 to 2019
 
@@ -330,6 +470,23 @@ census2018_prop <- census2018 %>%
 
 census2019 <- merge(census2019, census2018_prop, by.x = "GEOID", by.y = "GEOID", all.x = TRUE) %>%
   mutate(PV_change_pct = (median_property_value - median_pv_2018 * inflationAdjust2018) / median_pv_2018 * inflationAdjust2018)
+
+
+# 2020 to 2021
+
+census2020_prop <- census2020 %>%
+  select(GEOID, median_property_value) %>%
+  st_drop_geometry() %>% 
+  rename(median_pv_2020 = median_property_value)
+
+census2021 <- merge(census2021, census2020_prop, by.x = "GEOID", by.y = "GEOID", all.x = TRUE) %>%
+  mutate(PV_change_pct = (median_property_value - median_pv_2020 * inflationAdjust2020) / median_pv_2020 * inflationAdjust2020)
+
+# 2016 to 2018
+
+census2018_2 <- merge(census2018_2, census2016_prop, by.x = "GEOID", by.y = "GEOID", all.x = TRUE) %>%
+  mutate(PV_change_pct = (median_property_value - median_pv_2016 * inflationAdjust2016 * inflationAdjust2017) / median_pv_2016 * inflationAdjust2016 * inflationAdjust2017)
+
 
 ```
 
@@ -343,26 +500,41 @@ The two plots below show the result of gentrification in the year 2018 and 2019.
 
 ```{r fig.width=10}
 
-census2018_Gentrification <- census2018 %>%
-  select(GEOID, NW_change_pct, MedHhIBool_2017, PV_change_pct) %>%
-  mutate(Gentrification = ifelse(NW_change_pct < -0.04 & MedHhIBool_2017 == 1 & PV_change_pct > 0.05, 1, 0))
+census2017_Gentrification <- census2017 %>%
+  select(GEOID, NW_change_pct, MedHhIBool_2016, PV_change_pct) %>%
+  mutate(Gentrification = ifelse(NW_change_pct < -0.04 & MedHhIBool_2016 == 1 & PV_change_pct > 0.05, 1, 0))
 
 census2019_Gentrification <- census2019 %>%
   select(GEOID, NW_change_pct, MedHhIBool_2018, PV_change_pct) %>%
   mutate(Gentrification = ifelse(NW_change_pct < -0.04 & MedHhIBool_2018 == 1 & PV_change_pct > 0.05, 1, 0))
 
+census2021_Gentrification <- census2021 %>%
+  select(GEOID, NW_change_pct, MedHhIBool_2020, PV_change_pct) %>%
+  mutate(Gentrification = ifelse(NW_change_pct < -0.04 & MedHhIBool_2020 == 1 & PV_change_pct > 0.05, 1, 0))
 
-plot2018Gen <- ggplot() +
-  geom_sf(data = census2018_Gentrification, aes(fill=Gentrification), colour='grey') +
+census2018_2_Gentrification <- census2018_2 %>%
+  select(GEOID, NW_change_pct, MedHhIBool_2016, PV_change_pct) %>%
+  mutate(Gentrification = ifelse(NW_change_pct < -0.08 & MedHhIBool_2016 == 1 & PV_change_pct > 0.1, 1, 0))
+
+plot2017Gen <- ggplot() +
+  geom_sf(data = census2017_Gentrification, aes(fill=Gentrification), colour=NA) +
   theme_void()
 
 plot2019Gen <- ggplot() +
-  geom_sf(data = census2019_Gentrification, aes(fill=Gentrification), colour='grey') +
+  geom_sf(data = census2019_Gentrification, aes(fill=Gentrification), colour=NA) +
+  theme_void()
+
+plot2021Gen <- ggplot() +
+  geom_sf(data = census2021_Gentrification, aes(fill=Gentrification), colour=NA) +
+  theme_void()
+
+plot2018_2Gen <- ggplot() +
+  geom_sf(data = census2018_2_Gentrification, aes(fill=Gentrification), colour=NA) +
   theme_void()
 
 grid.arrange(
-  plot2018Gen, plot2019Gen,
-  ncol = 2  
+  plot2017Gen, plot2019Gen, plot2018_2Gen,
+  ncol = 3  
 ) 
 
 ```
