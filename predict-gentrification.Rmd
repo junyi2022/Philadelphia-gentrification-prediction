@@ -1013,7 +1013,11 @@ as.data.frame(t(summary_data)) %>%
 ```
 
 
-```{r}
+### Continous Features
+
+The plot shows an initial exploration of the relationship between our continuous independent variables and gentrification, our dependent variable. 
+
+```{r fig.height=6, fig.width=10}
 
 data2018 <-data2018%>%
   left_join(.,
@@ -1023,22 +1027,12 @@ data2018 <-data2018%>%
             by ="GEOID")%>%
   na.omit(Gentrification)
 
-```
-
-### Continous Features
-
-The plot shows an initial exploration of the relationship between our continuous independent variables and gentrification, our dependent variable. 
-
-```{r}
-
 #plot
-plot<-data2018 %>%
+
+data2018 %>%
     st_drop_geometry()%>%
     dplyr::select(Gentrification, 
-                  MedNumRooms,pctnonFamilyHH,pctOccupied,pctRent,pctBachelor,PopDensity) 
-  
-
-plot %>%
+                  MedNumRooms,pctnonFamilyHH,pctOccupied,pctRent,pctBachelor,PopDensity) %>%
     gather(Variable, value, -Gentrification) %>%
     ggplot() + 
     geom_density(aes(value, color=as.factor(Gentrification)), fill = "transparent") + 
@@ -1054,12 +1048,12 @@ plot %>%
 
 And also the relationship between our categorical independent variables and gentrification. 
 
-```{r}
+```{r fig.height=7, fig.width=10}
 
 plot<-data2018 %>%
     st_drop_geometry()%>%
     dplyr::select(Gentrification, 
-                  school,park,station,holc_grade) 
+                  school.factor,park.factor,station.factor,holc_grade) 
   
 plot %>%
     gather(Variable, value, -Gentrification) %>%
@@ -1096,7 +1090,7 @@ Gentrification.test <- data2018[-inTrain,]
 
 ### Analyzing associations
 
-Below is the table showcasing our final model. For specific details on model selection criteria, please refer to the appendix. Our analysis indicates that the percentage of non-family households, the percentage of individuals with Bachelor's degrees or higher, and population density are statistically significant predictors in the model.
+Below is the table showcasing our final model. For specific details on model selection criteria, please refer to the appendix. Our analysis indicates that the median number of rooms, the percentage of individuals with Bachelor's degrees or higher, and population density are statistically significant predictors in the model.
 
 ```{r, include = FALSE}
 
@@ -1124,11 +1118,21 @@ fit_metrics <- pR2(model)
 
 ```{r}
 
-stargazer(model,
-          title = "Model",
-          type = "text",
-          digits = 2,
-          no.space = TRUE)
+model_sum <- summary(model)
+
+coefficients_table <- as.data.frame(model_sum$coefficients)
+
+coefficients_table$significance <- ifelse(coefficients_table$`Pr(>|z|)` < 0.01, '***',
+                                                ifelse(coefficients_table$`Pr(>|z|)` < 0.05, '**',
+                                                       ifelse(coefficients_table$`Pr(>|z|)` < 0.1, '*', '')))
+
+coefficients_table$p_value <- paste0(round(coefficients_table$`Pr(>|z|)`, digits = 3), coefficients_table$significance)
+
+coefficients_table %>%
+  select(-significance, -`Pr(>|z|)`) %>% 
+  kable(align = "r", digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))  %>%
+  footnote(general_title = "\n", general = "Table 2")
 
 ```
 
@@ -1138,7 +1142,7 @@ stargazer(model,
 as.data.frame(t(fit_metrics)) %>%
   kable(caption = "Fit Metrics for Logistic Regression Model", digits = 4) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"))%>%
-  footnote(general_title = "\n", general = "Table 2")
+  footnote(general_title = "\n", general = "Table 3")
 
 ```
 
@@ -1172,7 +1176,7 @@ testProbs %>%
             Accuracy = round(yardstick::accuracy_vec(Outcome,factor(Value)),2)) %>%
   kable(caption = "Optimize Threshold") %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"))%>%
-  footnote(general_title = "\n", general = "Table 3")
+  footnote(general_title = "\n", general = "Table 4")
 
 ```
 
@@ -1206,7 +1210,7 @@ rownames(cm_df) <- NULL
 cm_df %>%
   kable() %>%
   kable_styling(bootstrap_options = c("striped", "hover"))  %>%
-  footnote(general_title = "\n", general = "Table 4")
+  footnote(general_title = "\n", general = "Table 5")
 
 ```
 
@@ -1275,7 +1279,7 @@ cvFit_df <- as.data.frame(cvFit$results)[, 2:7]
 cvFit_df %>% 
   kable(col.name=c('ROC', 'Sensitivity', 'Specificity', 'ROC SD', 'Sensitivity SD', 'Specificity SD'),caption = "Cross Validation", digits = 4) %>%
   kable_styling(bootstrap_options = c("striped", "hover"))  %>%
-  footnote(general_title = "\n", general = "Table 5")
+  footnote(general_title = "\n", general = "Table 6")
 
 ```
 
@@ -1339,7 +1343,7 @@ rownames(cm_df) <- NULL
 cm_df %>%
   kable() %>%
   kable_styling(bootstrap_options = c("striped", "hover"))  %>%
-  footnote(general_title = "\n", general = "Table 6")
+  footnote(general_title = "\n", general = "Table 7")
 ```
 
 
@@ -1431,13 +1435,21 @@ cvFit_df <- as.data.frame(cvFit$results)[, 2:7]
 cvFit_df %>% 
   kable(col.name=c('ROC', 'Sensitivity', 'Specificity', 'ROC SD', 'Sensitivity SD', 'Specificity SD'),caption = "Cross Validation", digits = 4) %>%
   kable_styling(bootstrap_options = c("striped", "hover"))  %>%
-  footnote(general_title = "\n", general = "Table 7")
+  footnote(general_title = "\n", general = "Table 8")
 
 ```
 
 Here, the ROC value is 0.71, which is slightly lower compared to the model that used 2018 data for cross-validation, which had an ROC of 0.74. Despite this slight decrease, the model still demonstrates a relatively good ability to differentiate between positive and negative outcomes.
 
 After cross-validation, the sensitivity improved dramatically to 1, meaning the model predicted all the gentrified areas correctly. Conversely, specificity dropping to 0 means that the model failed to correctly identify any of the negative cases post-cross-validation. 
+
+
+confusionMatrix_df %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))  %>%
+  footnote(general_title = "\n", general = "Table 9")
+
+```
 
 ```{r}
 
@@ -1654,7 +1666,7 @@ model_comparison <- model_comparison[-1, , drop = FALSE]  # Remove the first row
 # Create a table using kable
 kable(model_comparison, caption = "Comparison of AIC values") %>%
   kable_styling(bootstrap_options = c("striped", "hover"))  %>%
-  footnote(general_title = "\n", general = "Table 9")
+  footnote(general_title = "\n", general = "Table 10")
 
 ```
 
@@ -1801,7 +1813,7 @@ row.names(cvFit_combine) <- c("Model 5", "Model 6", "Model 7", "Model 8")
 cvFit_combine %>% 
   kable(col.name=c('ROC', 'Sensitivity', 'Specificity', 'ROC SD', 'Sensitivity SD', 'Specificity SD'),caption = "Cross Validation", digits = 4) %>%
   kable_styling(bootstrap_options = c("striped", "hover"))  %>%
-  footnote(general_title = "\n", general = "Table 10")
+  footnote(general_title = "\n", general = "Table 11")
 
 
 ```
