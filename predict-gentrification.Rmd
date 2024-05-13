@@ -1179,39 +1179,6 @@ testProbs %>%
 ```
 
 
-### Confusion matrix
-
-
-```{r}
-
-testProbs <- data.frame(Outcome = as.factor(Gentrification.test$Gentrification),
-                        Probs = predict(model, Gentrification.test, type= "response"))
-
-
-testProbs <- 
-  testProbs %>%
-  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.1 , 1, 0)))
-
-
-cm <- caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
-                       positive = "1")
-
-mosaicplot(cm$table, color=palette2, main = "Mosaic Plot for Confusion Matrix",
-           xlab = "Prediction", ylab = "Reference")
-
-cm_df <- as.data.frame(round(cm$byClass, digit = 3)) %>% 
-  head(5) %>%
-  t()
-
-rownames(cm_df) <- NULL
-
-cm_df %>%
-  kable() %>%
-  kable_styling(bootstrap_options = c("striped", "hover"))  %>%
-  footnote(general_title = "\n", general = "Table 5")
-
-```
-
 ### Cross validation
 
 ```{r, include = FALSE}
@@ -1277,18 +1244,24 @@ cvFit_df <- as.data.frame(cvFit$results)[, 2:7]
 cvFit_df %>% 
   kable(col.name=c('ROC', 'Sensitivity', 'Specificity', 'ROC SD', 'Sensitivity SD', 'Specificity SD'),caption = "Cross Validation", digits = 4) %>%
   kable_styling(bootstrap_options = c("striped", "hover"))  %>%
-  footnote(general_title = "\n", general = "Table 6")
+  footnote(general_title = "\n", general = "Table 5")
 
 ```
 
 
 ### Make Predictions
 
+
 ```{r}
 
-testProbs <- data.frame(Outcome = as.factor(Gentrification.test$Gentrification),
+testProbs <- Gentrification.test %>% mutate(Outcome = as.factor(Gentrification.test$Gentrification),
                         Probs = predict(model, Gentrification.test, type= "response"))
 
+testProbs <- 
+  testProbs %>%
+  mutate(predOutcome  = as.factor(ifelse(Probs > 0.1 , 1, 0)),
+         over.under = ifelse(predOutcome == 1 & Outcome == 0 , 'Overpredict',
+                             ifelse(predOutcome == 0 & Outcome == 1, 'Underpredict', NA)))
 
 ggplot(testProbs, aes(x = Probs, fill = as.factor(Outcome))) + 
   geom_density() +
@@ -1316,21 +1289,18 @@ ggplot(testProbs, aes(d = as.numeric(Outcome), m = Probs)) +
 ```
 
 
-
-
-#### Confusion Matrix
+### Confusion Matrix
 
 We employ a threshold of 0.1 to optimize the overall accuracy of the model. In other words, we want to maximum the total number of census block groups that are accurately predicted (0 as 0; 1 as 1). If two models can accurately predict similar number of block groups, we favor the one with higher sensitivity, meaning that it can identify more gentrification. This is because effective sensitivity empowers governments to implement targeted interventions in these areas, mitigating or reducing future gentrification.
 
 ```{r}
 
-testProbs <- 
-  testProbs %>%
-  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.1 , 1, 0)))
-
 
 cm <- caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
                        positive = "1")
+
+mosaicplot(cm$table, color=palette2, main = "Mosaic Plot for Confusion Matrix",
+           xlab = "Prediction", ylab = "Reference")
 
 cm_df <- as.data.frame(round(cm$byClass, digit = 3)) %>% 
   head(5) %>%
@@ -1339,11 +1309,28 @@ cm_df <- as.data.frame(round(cm$byClass, digit = 3)) %>%
 rownames(cm_df) <- NULL
 
 cm_df %>%
-  kable() %>%
+  kable(caption = "Confusion Matrix") %>%
   kable_styling(bootstrap_options = c("striped", "hover"))  %>%
-  footnote(general_title = "\n", general = "Table 7")
+  footnote(general_title = "\n", general = "Table 6")
+
 ```
 
+
+### Over and Under Prediction Location
+
+We also want to know which census block group gets over or under-predicted in our testing dataset. Over prediction means the block group is not gentrifying but we predict it as gentrifying, and under prediction means the block group is gentrifying but we predict it as not gentrifying. From the map below we can see that most over-prediction happens around University City and Center City, but there is no strong correlation between under-prediction and block group location. However, census block groups on the south side of University City have a slightly higher tendency to be underpredicted.     
+
+
+```{r fig.height=6, fig.width=8}
+
+ggplot() +
+  geom_sf(data = testProbs, aes(fill=over.under), colour='white', linewidth = 0.01) +
+  scale_fill_manual(values = palette2, na.value = "#e9e9e9",
+                     name = "Prediction") +
+  labs(title = "Over and Under Prediction of Testing Dataset in 2019") +
+  theme_void()
+
+```
 
 
 ## Validation
@@ -1386,9 +1373,6 @@ validationProbs$predOutcome <- factor(validationProbs$predOutcome, levels = leve
 ```
 
 
-
-
-
 ### 2017 Confusion Matrix
 
 ```{r 2017 Confusion Matrix}
@@ -1403,9 +1387,9 @@ confusionMatrix_df <- as.data.frame(round(confusionMatrix$byClass, digit = 3)) %
 rownames(confusionMatrix_df) <- NULL
 
 confusionMatrix_df %>%
-  kable() %>%
+  kable(caption = "Confusion Matrix") %>%
   kable_styling(bootstrap_options = c("striped", "hover"))  %>%
-  footnote(general_title = "\n", general = "Table 8")
+  footnote(general_title = "\n", general = "Table 7")
 
 ```
 
@@ -1448,9 +1432,9 @@ cvFit
 ```{r}
 cvFit_df <- as.data.frame(cvFit$results)[, 2:7]
 cvFit_df %>% 
-  kable(col.name=c('ROC', 'Sensitivity', 'Specificity', 'ROC SD', 'Sensitivity SD', 'Specificity SD'),caption = "Cross Validation", digits = 4) %>%
+  kable(col.name=c('ROC', 'Sensitivity', 'Specificity', 'ROC SD', 'Sensitivity SD', 'Specificity SD'), caption = "Cross Validation", digits = 4) %>%
   kable_styling(bootstrap_options = c("striped", "hover"))  %>%
-  footnote(general_title = "\n", general = "Table 9")
+  footnote(general_title = "\n", general = "Table 8")
 
 ```
 
@@ -1678,7 +1662,7 @@ model_comparison <- model_comparison[-1, , drop = FALSE]  # Remove the first row
 # Create a table using kable
 kable(model_comparison, caption = "Comparison of AIC values") %>%
   kable_styling(bootstrap_options = c("striped", "hover"))  %>%
-  footnote(general_title = "\n", general = "Table 10")
+  footnote(general_title = "\n", general = "Table 9")
 
 ```
 
@@ -1827,7 +1811,7 @@ row.names(cvFit_combine) <- c("Model 5", "Model 6", "Model 7", "Model 8")
 cvFit_combine %>% 
   kable(col.name=c('ROC', 'Sensitivity', 'Specificity', 'ROC SD', 'Sensitivity SD', 'Specificity SD'),caption = "Cross Validation", digits = 4) %>%
   kable_styling(bootstrap_options = c("striped", "hover"))  %>%
-  footnote(general_title = "\n", general = "Table 11")
+  footnote(general_title = "\n", general = "Table 10")
 
 
 ```
