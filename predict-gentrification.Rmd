@@ -1470,7 +1470,7 @@ ggplot(validationProbs, aes(d = as.numeric(Outcome), m = Probs)) +
 
 ```
 
-
+When compared to the 2018 model's ROC curve, several differences are notable. The ROC curve from 2018 showed a more stepped progression with sharper increases in the true positive rate at specific threshold levels. This might imply that the 2018 model had certain thresholds where its sensitivity dramatically increased, but these were balanced by intervals where the performance plateaued, indicating less consistency across threshold adjustments. In contrast, the newer model's smoother curve suggests a more consistent sensitivity to changes in the threshold, which could indicate a more stable model that generalizes better across different data scenarios.
 
 ## Summary
 
