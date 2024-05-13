@@ -1346,14 +1346,15 @@ cm_df %>%
   footnote(general_title = "\n", general = "Table 7")
 ```
 
+
+
 ## Validation
 
-Validate using the 2017 Data
-and compared with the 2018 model results
+Here, we will use Philadelphia city data from 2017-2018 to evaluate the model's performance.
 
 ```{r 2017 data}
 
-data2017 <-data2017%>%
+data2017 <- data2017%>%
   left_join(.,
             census2018_Gentrification%>%
               st_drop_geometry()%>%
@@ -1386,45 +1387,9 @@ validationProbs$predOutcome <- factor(validationProbs$predOutcome, levels = leve
 
 ```
 
-### 2017 Cross Validation
 
-```{r 2017 cv, include=FALSE}
-cvFit <- train(Gentrification ~ MedNumRooms+pctnonFamilyHH+pctOccupied+pctRent+pctBachelor+PopDensity+
-                school+park+station.factor+Burglary+holc_grade,
-  data = data2017 %>%
-    dplyr::select(-GEOID, -geometry),
-  method = "glm",
-  family = "binomial",
-  metric = "ROC",
-  trControl = ctrl
-)
 
-cvFit
-```
 
-```{r, eval=FALSE}
-cvFit <- train(Gentrification ~ MedNumRooms+pctnonFamilyHH+pctOccupied+pctRent+pctBachelor+PopDensity+
-                school+park+station.factor+Burglary+holc_grade,
-  data = data2017 %>%
-    dplyr::select(-GEOID, -geometry),
-  method = "glm",
-  family = "binomial",
-  metric = "ROC",
-  trControl = ctrl
-)
-
-cvFit
-```
-
-```{r}
-
-cvFit_df <- as.data.frame(cvFit$results)[, 2:7]
-cvFit_df %>% 
-  kable(col.name=c('ROC', 'Sensitivity', 'Specificity', 'ROC SD', 'Sensitivity SD', 'Specificity SD'),caption = "Cross Validation", digits = 4) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"))  %>%
-  footnote(general_title = "\n", general = "Table 8")
-
-```
 
 ### 2017 Confusion Matrix
 
@@ -1442,12 +1407,53 @@ rownames(confusionMatrix_df) <- NULL
 confusionMatrix_df %>%
   kable() %>%
   kable_styling(bootstrap_options = c("striped", "hover"))  %>%
+  footnote(general_title = "\n", general = "Table 8")
+
+```
+A sensitivity of 0.25 indicates that the model correctly identifies only 25% of gentrified areas, which is relatively low. Combined with a low positive predictive value, this suggests that the model is relatively ineffective at accurately predicting gentrified areas. However, a specificity of 0.82 suggests that it is relatively good at identifying areas that are not gentrified.
+
+
+### 2017 Cross Validation
+
+cross validate using 2017 data
+
+```{r, eval=FALSE}
+cvFit <- train(Gentrification ~ MedNumRooms+pctnonFamilyHH+pctOccupied+pctRent+pctBachelor+PopDensity+
+                school+park+station.factor+Burglary+holc_grade,
+  data = data2017 %>%
+    dplyr::select(-GEOID, -geometry),
+  method = "glm",
+  family = "binomial",
+  metric = "ROC",
+  trControl = ctrl
+)
+
+cvFit
+
+
+cvFit_df <- as.data.frame(cvFit$results)[, 2:7]
+cvFit_df %>% 
+  kable(col.name=c('ROC', 'Sensitivity', 'Specificity', 'ROC SD', 'Sensitivity SD', 'Specificity SD'),caption = "Cross Validation", digits = 4) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))  %>%
+  footnote(general_title = "\n", general = "Table 8")
+
+```
+
+Here, the ROC value is 0.71, which is slightly lower compared to the model that used 2018 data for cross-validation, which had an ROC of 0.74. Despite this slight decrease, the model still demonstrates a relatively good ability to differentiate between positive and negative outcomes.
+
+After cross-validation, the sensitivity improved dramatically to 1, meaning the model predicted all the gentrified areas correctly. Conversely, specificity dropping to 0 means that the model failed to correctly identify any of the negative cases post-cross-validation. 
+
+
+confusionMatrix_df %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))  %>%
   footnote(general_title = "\n", general = "Table 9")
 
 ```
+
 ```{r}
 
-ggplot(testProbs, aes(x = Probs, fill = as.factor(Outcome))) + 
+ggplot(validationProbs, aes(x = Probs, fill = as.factor(Outcome))) + 
   geom_density() +
   facet_grid(Outcome ~ .) +
   scale_fill_manual(values = palette2) +
@@ -1458,6 +1464,10 @@ ggplot(testProbs, aes(x = Probs, fill = as.factor(Outcome))) +
   theme(legend.position = "none") 
 
 ```
+
+The blue plot shows a high density of predicted probabilities close to 0, which indicates that the model confidently predicts a large number of areas as not gentrified. This is consistent with the relatively high specificity observed (0.82), as the model successfully identifies a significant proportion of true negatives. The red plot, however, shows most predicted probabilities clustered around the lower end (below 0.2), with a very small portion exceeding this range. This distribution explains the low sensitivity (0.25) because the model assigns low probabilities to most actual gentrified areas, failing to recognize them as such.
+
+The 2018 model appears slightly better calibrated for predicting gentrified areas, as indicated by a broader spread of probabilities for gentrified cases. It may be detecting gentrification indicators more effectively than the 2017 model. 
 
 ### 2017 ROC Curve
 
@@ -1472,7 +1482,7 @@ ggplot(validationProbs, aes(d = as.numeric(Outcome), m = Probs)) +
 
 ```
 
-
+When compared to the 2018 model's ROC curve, several differences are notable. The ROC curve from 2018 showed a more stepped progression with sharper increases in the true positive rate at specific threshold levels. This might imply that the 2018 model had certain thresholds where its sensitivity dramatically increased, but these were balanced by intervals where the performance plateaued, indicating less consistency across threshold adjustments. In contrast, the newer model's smoother curve suggests a more consistent sensitivity to changes in the threshold, which could indicate a more stable model that generalizes better across different data scenarios.
 
 ## Summary
 
