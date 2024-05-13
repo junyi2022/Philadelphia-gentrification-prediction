@@ -76,8 +76,6 @@ This project aims to use machine learning methods to forecast patterns of gentri
 
 This project will use the 2018 and 2019 data to train the machine learning model and use the 2017 and 2018 data to do the validation. There are two reasons for this decision. Firstly, the COVID pandemic in 2020 largely impacted the normal pattern of people's daily life, so we don't want our model to span across the year 2020. Secondly, the area of each census block group gets updated [every decade](https://learn.arcgis.com/en/related-concepts/united-states-census-geography.htm#:~:text=Census%20blocks%20are%20often%20the,&#41;%20or%20centroids%20&#40;points&#41;.), so we are not able to get the same census block group before and after 2020.     
 
-The census data used in this project is from [American Census Survey (ACS)](https://data.census.gov/) 5-year survey, and other data used in this project comes from [OpenDataPhilly](https://opendataphilly.org/).    
-
 
 ## Calculate Gentrification (Dependent Variable)
 
@@ -216,7 +214,7 @@ census2019 <- census2019 %>%
 
 ### Property Value Data
 
-The property value data used in this project comes from OpenDataPhilly's [Philadelphia Properties and Assessment History](https://opendataphilly.org/datasets/philadelphia-properties-and-assessment-history/) dataset. Because this dataset does not have geometry, we need to join this to the [Philadelphia Water Department's parcel data](https://opendataphilly.org/datasets/pwd-stormwater-billing-parcels/), which is originally used to calculate parcel-based stormwater charges for PWD customers under the new parcel-based stormwater billing program.   
+The property value data used in this project comes from OpenDataPhilly's [Philadelphia Properties and Assessment History](https://opendataphilly.org/datasets/philadelphia-properties-and-assessment-history/) dataset. Because this dataset does not have geometry, we need to join this to the [Philadelphia Water Department's parcel data](https://opendataphilly.org/datasets/pwd-stormwater-billing-parcels/), which is originally used to calculate parcel-based storm water charges for PWD customers under the new parcel-based storm water billing program.   
 
 Since our analysis needs 2017 to 2019's data, we will first extract these three years' property data from the history dataset.   
 
@@ -238,7 +236,7 @@ PWDparcel$BRT_ID <- as.numeric(PWDparcel$BRT_ID)
 
 ```
 
-In order to match the properties with the parcels, we use certain IDs to join them, and those are `parcel_number` in the property dataset and `BRT_ID` in the PWD parcel dataset. After joining these two dataset together, we will calculate the median property value in each census block group and add that as a new column in the corresponding census dataframe. This process will repeat for 3 times since we need to manipulate 3 years' data.    
+In order to match the properties with the parcels, we use certain IDs to join them, and those are `parcel_number` in the property dataset and `BRT_ID` in the PWD parcel dataset. After joining these two datasets together, we will calculate the median property value in each census block group and add that as a new column in the corresponding census dataframe. This process will repeat for 3 times since we need to manipulate 3 years' data.    
 
 
 ```{r}
@@ -300,7 +298,7 @@ census2018 <- merge(census2018, median_property_value_2018, by.x = "GEOID", by.y
 
 ### Calculate change
 
-Because the standard for calculating gentrification involves change between two years, we need to transfer the 2017 data to the 2018 dataframe and the 2018 data to the 2019 dataframe. Firstly, we transfer the percentage of minority(non-white) group and calculate the percent change within 1 year.    
+Because the standard for calculating gentrification involves change between two years, we need to transfer the 2017 data to the 2018 dataframe and the 2018 data to the 2019 dataframe. Firstly, we transfer the percentage of minority(non-white) group and calculate the percent change within 1 year for 2018 and 2019.    
 
 ```{r fig.height=6, fig.width=12}
 
@@ -370,7 +368,7 @@ grid.arrange(
 
 Secondly, we transfer the median household income difference and categorize this value. If the median household income one year ago is greater than the Philadelphia median, the census block group will get a `1`, and if the median household income one year ago is less than the Philadelphia median, the census block group will get a `0`. Besides, since we originally have some NA household income value, we will keep this new categorized value in those census block groups as NA.    
 
-```{r fig.height=6, fig.width=12.5}
+```{r fig.height=6, fig.width=12.6}
 
 # 2017 to 2018
 
@@ -424,7 +422,7 @@ grid.arrange(
 
 ```
 
-We also need to calculate the median value change within 1 year. In this way, we need to add the property value of 2017 in the 2018 dataframe and the property value of 2018 in the 2019 dataframe in order to calculate the difference. In order to calculate the percent change of the median property value, we also need to adjust for inflation.   
+We also need to calculate the median property value change within 1 year. In this way, we need to add the property value of 2017 in the 2018 dataframe and the property value of 2018 in the 2019 dataframe in order to calculate the difference. Besides, we also need to adjust for inflation.   
 
 ```{r fig.height=6, fig.width=12}
 
@@ -497,7 +495,7 @@ grid.arrange(
 
 After all the manipulations above, we will finally calculate whether a census block group is gentrifying. If a census block group's percentage of minority group (non-white) decreases by more than 4% in 1 year, median household income one year ago was below Philadelphia's median, and property value increased by more than 5%, it will be categorized as `1`, meaning that it is gentrifying. Otherwise, it will receive a value of `0`, meaning that it is not gentrifying.    
 
-The two plots below show the result of gentrification in the year 2018 and 2019. We can see more census block groups are gentrifying as time goes by, and most of them located around Center City and University City.  
+The two plots below show the result of gentrification in the year 2018 and 2019. We can see more census block groups are gentrifying as time goes by, and most of them are located around Center City and University City.  
 
 
 ```{r fig.height=6, fig.width=12}
@@ -769,7 +767,7 @@ Demo2018 <- get_acs(geography = "block group",
 
 __School__
 
-Education amenities serve as an important independent variable in our analysis. When a block group offers quality educational resources, it often attracts individuals seeking access to such amenities. This influx of residents seeking quality education can contribute to an increase in housing values and may consequently lead to gentrification within the area. To quantify this effect, we calculate the total count of schools within each group as a variable of interest. The school data comes from The School District of Philadelphia's [School Lists](https://www.philasd.org/performance/programsservices/open-data/school-information/#school_lists) dataset.  
+Education amenities serve as an important independent variable in our analysis. When a block group offers quality educational resources, it often attracts individuals seeking access to such amenities. This influx of residents seeking quality education can contribute to an increase in housing values and may consequently lead to gentrification within the area. To quantify this effect, we calculate the total count of schools within each block group as a variable of interest. The school data comes from The School District of Philadelphia's [School Lists](https://www.philasd.org/performance/programsservices/open-data/school-information/#school_lists) dataset.  
 
 ```{r, include=FALSE}
 #2017
@@ -874,7 +872,7 @@ station_block2018 <- st_join(station,
 
 __Burglary__ 
 
-Residents are drawn to areas with enhanced safety measures. To assess the safety level of each block group, we utilize burglary data as a metric.The crime data comes from Opendataphilly [Crime Incidents](https://opendataphilly.org/datasets/crime-incidents/) dataset.
+Residents are drawn to areas with enhanced safety measures. To assess the safety level of each block group, we utilize burglary data as a metric. The crime data comes from Opendataphilly [Crime Incidents](https://opendataphilly.org/datasets/crime-incidents/) dataset.
 
 ```{r, include=FALSE}
 
@@ -908,7 +906,7 @@ crime_block2018 <- st_join(crime2018, Demo2018) %>%
 
 __Redlining__
 
-Moreover, we want to explore the  the influence of historic redlining on current gentrification trends. For example, whether gentrification tends to occur more frequently in areas that historically received better grades. 
+Moreover, we want to explore the influence of historic redlining on current gentrification trends. For example, whether gentrification tends to occur more frequently in areas that historically received better grades. 
 The historic Redlining data comes from [Philadelphia Office of the Controller](https://controller.phila.gov/philadelphia-audits/mapping-the-legacy-of-structural-racism-in-philadelphia/) .
 
 ```{r, include=FALSE}
@@ -946,9 +944,9 @@ Redline_block <- st_join(Demo2017, Redline) %>%
 ```
 
 
-## Summarize and preview the variables
+### Summarize and preview the variables
 
-The table shows all the independent variables by categories.
+The table below shows a summary of all the possible independent variables.
 
 ```{r}
 
@@ -1015,7 +1013,7 @@ as.data.frame(t(summary_data)) %>%
 
 ### Continous Features
 
-The plot shows an initial exploration of the relationship between our continuous independent variables and gentrification, our dependent variable. 
+The plot below shows an initial exploration of the relationship between our continuous independent variables and gentrification, our dependent variable. 
 
 ```{r fig.height=6, fig.width=10}
 
@@ -1062,7 +1060,7 @@ plot %>%
         geom_bar(position = "dodge", stat="identity") +
         facet_wrap(~Variable, scales="free") +
         scale_fill_manual(values = palette2) +
-        labs(x="Recidivism", y="Value",
+        labs(x="Categories", y="Value",
              title = "Feature associations with Gentrification",
              subtitle = "Categorical features") +
   theme_minimal()+
@@ -1090,7 +1088,7 @@ Gentrification.test <- data2018[-inTrain,]
 
 ### Analyzing associations
 
-Below is the table showcasing our final model. For specific details on model selection criteria, please refer to the appendix. Our analysis indicates that the median number of rooms, the percentage of individuals with Bachelor's degrees or higher, and population density are statistically significant predictors in the model.
+Below is the table showcasing our final model. For specific details on model selection criteria, please refer to the appendix. Because there are only 1336 census block groups in Philadelphia, our dataset does not have a lot of data to work with. In this way, after we randomly splitting the original dataset into training and testing data, the summary of the variables is fluctuated. However, the percentage of individuals with Bachelor's degrees or higher continuously to be statistically significant predictors in the model.
 
 ```{r, include = FALSE}
 
@@ -1130,7 +1128,7 @@ coefficients_table$p_value <- paste0(round(coefficients_table$`Pr(>|z|)`, digits
 
 coefficients_table %>%
   select(-significance, -`Pr(>|z|)`) %>% 
-  kable(align = "r", digits = 2) %>%
+  kable(caption = "Model Summary", align = "r", digits = 2) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"))  %>%
   footnote(general_title = "\n", general = "Table 2")
 
@@ -1322,7 +1320,7 @@ ggplot(testProbs, aes(d = as.numeric(Outcome), m = Probs)) +
 
 #### Confusion Matrix
 
-We employ a threshold of 0.1 to optimize the sensitivity. We want a better sensitivity. A good sensitivity means that our model could correctly identify  True Positive, the gentrification block groups. Effective sensitivity empowers governments to implement targeted interventions in these areas, mitigating or reducing future gentrification.
+We employ a threshold of 0.1 to optimize the overall accuracy of the model. In other words, we want to maximum the total number of census block groups that are accurately predicted (0 as 0; 1 as 1). If two models can accurately predict similar number of block groups, we favor the one with higher sensitivity, meaning that it can identify more gentrification. This is because effective sensitivity empowers governments to implement targeted interventions in these areas, mitigating or reducing future gentrification.
 
 ```{r}
 
@@ -1350,7 +1348,7 @@ cm_df %>%
 
 ## Validation
 
-Here, we will use Philadelphia city data from 2017-2018 to evaluate the model's performance.
+Here, we will use Philadelphia city data from 2017-2018 to evaluate the model's performance.  
 
 ```{r 2017 data}
 
@@ -1410,12 +1408,27 @@ confusionMatrix_df %>%
   footnote(general_title = "\n", general = "Table 8")
 
 ```
-A sensitivity of 0.25 indicates that the model correctly identifies only 25% of gentrified areas, which is relatively low. Combined with a low positive predictive value, this suggests that the model is relatively ineffective at accurately predicting gentrified areas. However, a specificity of 0.82 suggests that it is relatively good at identifying areas that are not gentrified.
+
+A sensitivity of 0.375 indicates that the model correctly identifies only 37.5% of gentrified areas, which is relatively low. Combined with a low positive predictive value, this suggests that the model is relatively ineffective at accurately predicting gentrified areas. However, a specificity around 0.9 suggests that it is relatively good at identifying areas that are not gentrified.  
 
 
 ### 2017 Cross Validation
 
-cross validate using 2017 data
+
+```{r, include=FALSE}
+cvFit <- train(Gentrification ~ MedNumRooms+pctnonFamilyHH+pctOccupied+pctRent+pctBachelor+PopDensity+
+                school+park+station.factor+Burglary+holc_grade,
+  data = data2017 %>%
+    dplyr::select(-GEOID, -geometry),
+  method = "glm",
+  family = "binomial",
+  metric = "ROC",
+  trControl = ctrl
+)
+
+cvFit
+
+```
 
 ```{r, eval=FALSE}
 cvFit <- train(Gentrification ~ MedNumRooms+pctnonFamilyHH+pctOccupied+pctRent+pctBachelor+PopDensity+
@@ -1430,18 +1443,20 @@ cvFit <- train(Gentrification ~ MedNumRooms+pctnonFamilyHH+pctOccupied+pctRent+p
 
 cvFit
 
+```
 
+```{r}
 cvFit_df <- as.data.frame(cvFit$results)[, 2:7]
 cvFit_df %>% 
   kable(col.name=c('ROC', 'Sensitivity', 'Specificity', 'ROC SD', 'Sensitivity SD', 'Specificity SD'),caption = "Cross Validation", digits = 4) %>%
   kable_styling(bootstrap_options = c("striped", "hover"))  %>%
-  footnote(general_title = "\n", general = "Table 8")
+  footnote(general_title = "\n", general = "Table 9")
 
 ```
 
-Here, the ROC value is 0.71, which is slightly lower compared to the model that used 2018 data for cross-validation, which had an ROC of 0.74. Despite this slight decrease, the model still demonstrates a relatively good ability to differentiate between positive and negative outcomes.
+Here, the ROC value is 0.65, which is slightly lower compared to the model that used 2018 data for cross-validation, which had an ROC of 0.77. Despite this slight decrease, the model still demonstrates a relatively good ability to differentiate between positive and negative outcomes.  
 
-After cross-validation, the sensitivity improved dramatically to 1, meaning the model predicted all the gentrified areas correctly. Conversely, specificity dropping to 0 means that the model failed to correctly identify any of the negative cases post-cross-validation. 
+After cross-validation, the sensitivity improved dramatically to 1, meaning the model predicted all the gentrified areas correctly. Conversely, specificity dropping to 0 means that the model failed to correctly identify any of the negative cases post-cross-validation.   
 
 
 ```{r}
@@ -1458,9 +1473,9 @@ ggplot(validationProbs, aes(x = Probs, fill = as.factor(Outcome))) +
 
 ```
 
-The blue plot shows a high density of predicted probabilities close to 0, which indicates that the model confidently predicts a large number of areas as not gentrified. This is consistent with the relatively high specificity observed (0.82), as the model successfully identifies a significant proportion of true negatives. The red plot, however, shows most predicted probabilities clustered around the lower end (below 0.2), with a very small portion exceeding this range. This distribution explains the low sensitivity (0.25) because the model assigns low probabilities to most actual gentrified areas, failing to recognize them as such.
+The blue plot shows a high density of predicted probabilities close to 0, which indicates that the model confidently predicts a large number of areas as not gentrified. This is consistent with the relatively high specificity observed, as the model successfully identifies a significant proportion of true negatives. The red plot, however, shows most predicted probabilities clustered around the lower end (below 0.2), with a very small portion exceeding this range. This distribution explains the low sensitivity because the model assigns low probabilities to most actual gentrified areas, failing to recognize them as such.  
 
-The 2018 model appears slightly better calibrated for predicting gentrified areas, as indicated by a broader spread of probabilities for gentrified cases. It may be detecting gentrification indicators more effectively than the 2017 model. 
+The 2018 model appears slightly better calibrated for predicting gentrified areas, as indicated by a broader spread of probabilities for gentrified cases. It may be detecting gentrification indicators more effectively than the 2017 model.   
 
 ### 2017 ROC Curve
 
@@ -1475,21 +1490,19 @@ ggplot(validationProbs, aes(d = as.numeric(Outcome), m = Probs)) +
 
 ```
 
-When compared to the 2018 model's ROC curve, several differences are notable. The ROC curve from 2018 showed a more stepped progression with sharper increases in the true positive rate at specific threshold levels. This might imply that the 2018 model had certain thresholds where its sensitivity dramatically increased, but these were balanced by intervals where the performance plateaued, indicating less consistency across threshold adjustments. In contrast, the newer model's smoother curve suggests a more consistent sensitivity to changes in the threshold, which could indicate a more stable model that generalizes better across different data scenarios.
+When compared to the 2018 model's ROC curve, several differences are notable. The ROC curve from 2018 showed a more stepped progression with sharper increases in the true positive rate at specific threshold levels. This might imply that the 2018 model had certain thresholds where its sensitivity dramatically increased, but these were balanced by intervals where the performance plateaued, indicating less consistency across threshold adjustments. In contrast, the newer model's smoother curve suggests a more consistent sensitivity to changes in the threshold, which could indicate a more stable model that generalizes better across different data scenarios.   
 
 ## Summary
 
-To summarize, this model employs demographic indicators such as the percentage of minority groups, median household income, and changes in household income to analyze gentrification in Philadelphia. It incorporates additional socio-economic and urban amenities data to predict areas undergoing gentrification. The model focuses on accurately identifying true positive areas, aiming to pinpoint actual gentrified locations effectively. It has been tested with data from the previous year and successfully identified all the gentrified areas noted.
+To summarize, this model employs demographic and economic indicators such as the percentage change of minority groups, median household income, and change in property value to analyze gentrification in Philadelphia. It incorporates additional socio-economic and urban amenities data to predict areas undergoing gentrification. The model focuses on accurately identifying true positive and true negative areas, aiming to pinpoint actual gentrified and non-gentrified locations effectively. It has been tested with data from the previous years and successfully identified most of the gentrified areas noted.   
 
-Moving forward, this model serves as a valuable tool for city planners and policymakers to identify neighborhoods at risk of gentrification. It enables the development of strategies that promote balanced growth, including affordable housing initiatives and support for existing communities. The model's flexibility allows for ongoing refinement and incorporation of new data and trends, improving both its accuracy and applicability.
+Moving forward, this model serves as a valuable tool for city planners and policymakers to identify neighborhoods at risk of gentrification. It enables the development of strategies that promote balanced growth, including affordable housing initiatives and support for existing communities. The model's flexibility allows for ongoing refinement and incorporation of new data and trends, improving both its accuracy and applicability.   
 
-Additionally, by tracking the effects of gentrification, the model helps mitigate adverse outcomes such as the displacement of lower-income families and the erosion of cultural heritage. It also provides community advocates and local stakeholders with data-driven insights, supporting efforts to advocate for inclusive urban policies.
+Additionally, by tracking the effects of gentrification, the model can help mitigate adverse outcomes such as the displacement of lower-income families and the erosion of cultural heritage. It also provides community advocates and local stakeholders with data-driven insights, supporting efforts to advocate for inclusive urban policies.   
 
-Looking ahead, future iterations of the model could integrate real-time data feeds, enhancing its responsiveness to rapid urban changes. This would facilitate more dynamic assessments of gentrification risks and enable more timely and effective interventions.
+Looking ahead, future iterations of the model could integrate real-time data feeds, enhancing its responsiveness to rapid urban changes. This would facilitate more dynamic assessments of gentrification risks and enable more timely and effective interventions.    
 
 ## Appendix
-
-data source, variable definition, model specification
 
 ### Model specification
 
@@ -1522,7 +1535,7 @@ numericVars %>%
 
 ### Model Comparison
 
-We chose Model 6 as the final model because it performed well on several evaluation metrics. When comparing McFadden R-squared, AIC, and AUC together, Model 6 showed better predictive power and model fit. In addition, Model 6's AUC demonstrated greater stability during cross-validation, further solidifying its position as the model of choice for the analysis.
+We chose Model 6 as the final model because it performed well on several evaluation metrics with higher stability. Because our sample size is small, the result can be highly fluctuated based on the random sample we get. One model that performs well with one random split may not perform well another time. In this way, we want to choose a model that can stably performs well. When comparing McFadden R-squared, AIC, and AUC together, Model 6 showed good predictive power and model fit. In addition, Model 6's AUC demonstrated greater stability during cross-validation, further solidifying its position as the model of choice for the analysis.
 
 ```{r, include=FALSE}
 
@@ -1670,6 +1683,8 @@ kable(model_comparison, caption = "Comparison of AIC values") %>%
 ```
 
 __AUC__
+
+Because previous analysis already shows model 1-4 perform worse than model 5-8, this section only focuses on model 5-8.  
 
 ```{r, include=FALSE}
 
