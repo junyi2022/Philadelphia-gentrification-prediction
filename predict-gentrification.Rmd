@@ -1410,12 +1410,28 @@ confusionMatrix_df %>%
   footnote(general_title = "\n", general = "Table 8")
 
 ```
+
 A sensitivity of 0.25 indicates that the model correctly identifies only 25% of gentrified areas, which is relatively low. Combined with a low positive predictive value, this suggests that the model is relatively ineffective at accurately predicting gentrified areas. However, a specificity of 0.82 suggests that it is relatively good at identifying areas that are not gentrified.
 
 
 ### 2017 Cross Validation
 
 cross validate using 2017 data
+
+```{r, include=FALSE}
+cvFit <- train(Gentrification ~ MedNumRooms+pctnonFamilyHH+pctOccupied+pctRent+pctBachelor+PopDensity+
+                school+park+station.factor+Burglary+holc_grade,
+  data = data2017 %>%
+    dplyr::select(-GEOID, -geometry),
+  method = "glm",
+  family = "binomial",
+  metric = "ROC",
+  trControl = ctrl
+)
+
+cvFit
+
+```
 
 ```{r, eval=FALSE}
 cvFit <- train(Gentrification ~ MedNumRooms+pctnonFamilyHH+pctOccupied+pctRent+pctBachelor+PopDensity+
@@ -1430,7 +1446,9 @@ cvFit <- train(Gentrification ~ MedNumRooms+pctnonFamilyHH+pctOccupied+pctRent+p
 
 cvFit
 
+```
 
+```{r}
 cvFit_df <- as.data.frame(cvFit$results)[, 2:7]
 cvFit_df %>% 
   kable(col.name=c('ROC', 'Sensitivity', 'Specificity', 'ROC SD', 'Sensitivity SD', 'Specificity SD'),caption = "Cross Validation", digits = 4) %>%
@@ -1443,6 +1461,7 @@ Here, the ROC value is 0.71, which is slightly lower compared to the model that 
 
 After cross-validation, the sensitivity improved dramatically to 1, meaning the model predicted all the gentrified areas correctly. Conversely, specificity dropping to 0 means that the model failed to correctly identify any of the negative cases post-cross-validation. 
 
+```{r}
 
 confusionMatrix_df %>%
   kable() %>%
@@ -1450,6 +1469,7 @@ confusionMatrix_df %>%
   footnote(general_title = "\n", general = "Table 9")
 
 ```
+
 
 ```{r}
 
